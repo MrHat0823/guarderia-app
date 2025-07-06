@@ -4,6 +4,9 @@ import { supabase } from '../../lib/supabase'
 import type { Nino, Aula } from '../../lib/types'
 
 export function ChildrenManagement() {
+  const [formError, setFormError] = useState('')
+  const [formSuccess, setFormSuccess] = useState('')
+
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [totalCount, setTotalCount] = useState(0)
@@ -81,55 +84,76 @@ useEffect(() => {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  setLoading(true)
+  setFormError('')
+  setFormSuccess('')
 
-    try {
-      const childData = {
-        nombres: formData.nombres,
-        apellidos: formData.apellidos,
-        tipo_documento: formData.tipo_documento,
-        numero_documento: formData.numero_documento,
-        aula_id: formData.aula_id || null,
-        activo: formData.activo
-      }
-
-     // console.log("Tipo documento antes de guardar:", formData.tipo_documento)
-
-
-      if (editingChild) {
-        const { error } = await supabase
-          .from('ninos')
-          .update(childData)
-          .eq('id', editingChild.id)
-
-        if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from('ninos')
-          .insert(childData)
-
-        if (error) throw error
-      }
-
-      await loadChildren()
-      setShowCreateForm(false)
-      setEditingChild(null)
-      setFormData({
-        nombres: '',
-        apellidos: '',
-        tipo_documento: 'TI',
-        numero_documento: '',
-        aula_id: '',
-        activo: true
-      })
-    } catch (error) {
-      console.error('Error saving child:', error)
-    } finally {
-      setLoading(false)
+  try {
+    const childData = {
+      nombres: formData.nombres,
+      apellidos: formData.apellidos,
+      tipo_documento: formData.tipo_documento,
+      numero_documento: formData.numero_documento,
+      aula_id: formData.aula_id || null,
+      activo: formData.activo
     }
+
+    if (editingChild) {
+      const { error } = await supabase
+        .from('ninos')
+        .update(childData)
+        .eq('id', editingChild.id)
+
+      if (error) throw error
+
+      setFormSuccess('Niño actualizado correctamente.')
+    } else {
+      // Verificar si ya existe el número de documento
+      const { data: existing, error: existingError } = await supabase
+        .from('ninos')
+        .select('id')
+        .eq('numero_documento', childData.numero_documento)
+        .maybeSingle()
+
+      if (existingError) throw existingError
+
+      if (existing) {
+        setFormError('Ya existe un niño con ese número de documento.')
+        return
+      }
+
+      const { error } = await supabase
+        .from('ninos')
+        .insert(childData)
+
+      if (error) throw error
+
+      setFormSuccess('Niño creado correctamente.')
+    }
+
+    await loadChildren()
+    setShowCreateForm(false)
+    setEditingChild(null)
+    setFormData({
+      nombres: '',
+      apellidos: '',
+      tipo_documento: 'TI',
+      numero_documento: '',
+      aula_id: '',
+      activo: true
+    })
+
+    setTimeout(() => setFormSuccess(''), 3000)
+  } catch (error) {
+    console.error('Error saving child:', error)
+    setFormError('Ocurrió un error al guardar el niño.')
+  } finally {
+    setLoading(false)
   }
+}
+
 
   const handleEdit = (child: Nino) => {
     setEditingChild(child)
@@ -196,6 +220,18 @@ useEffect(() => {
                 {editingChild ? 'Editar Niño' : 'Agregar Niño'}
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">
+
+                {formError && (
+                    <p className="text-red-600 text-sm bg-red-100 border border-red-200 p-2 rounded-lg">
+                      {formError}
+                    </p>
+                  )}
+                  {formSuccess && (
+                    <p className="text-green-600 text-sm bg-green-100 border border-green-200 p-2 rounded-lg">
+                      {formSuccess}
+                    </p>
+                  )}
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Nombres

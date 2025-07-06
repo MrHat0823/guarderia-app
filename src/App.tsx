@@ -11,6 +11,8 @@ import { GuardianManagement } from './components/management/GuardianManagement'
 import { ClassroomManagement } from './components/management/ClassroomManagement'
 import { UserSettings } from './components/settings/UserSettings'
 import { useAuth } from './hooks/useAuth'
+import { AttendanceSummary } from './components/attendance/AttendanceSummary'
+
 
 function App() {
   const { user, loading } = useAuth()
@@ -61,6 +63,9 @@ function App() {
         return <ClassroomManagement />
       case 'settings':
         return <UserSettings />
+        case 'attendance-summary':
+        return <AttendanceSummary />
+
       default:
         return <Dashboard onNavigate={setActiveTab} />
     }

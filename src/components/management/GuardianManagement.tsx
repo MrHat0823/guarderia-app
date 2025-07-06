@@ -18,6 +18,9 @@ interface ChildWithRelationship {
 }
 
 export function GuardianManagement() {
+  const [formError, setFormError] = useState('')
+  const [formSuccess, setFormSuccess] = useState('')
+
   const [guardians, setGuardians] = useState<Acudiente[]>([])
   const [children, setChildren] = useState<Nino[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -155,31 +158,62 @@ const fetchGuardians = async () => {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    try {
-      if (editingGuardian) {
-        const { error } = await supabase
-          .from('acudientes')
-          .update(formData)
-          .eq('id', editingGuardian.id)
-        
-        if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from('acudientes')
-          .insert([formData])
-        
-        if (error) throw error
-      }
-      
-      await fetchGuardians()
-      resetForm()
-    } catch (error) {
-      console.error('Error saving guardian:', error)
-    }
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  setFormError('')
+  setFormSuccess('')
+
+  try {
+   if (!editingGuardian) {
+  // Verificar si ya existe ese número de documento
+  const { data: existing, error: existingError } = await supabase
+    .from('acudientes')
+    .select('id')
+    .eq('numero_documento', formData.numero_documento)
+    .maybeSingle()
+
+  if (existingError) throw existingError
+
+  if (existing) {
+    setFormError('Ya existe un acudiente con ese número de documento.')
+    return
   }
+
+  const { error } = await supabase
+    .from('acudientes')
+    .insert([formData])
+
+  if (error) throw error
+
+  setFormSuccess('Acudiente creado correctamente.')
+} else {
+  const { error } = await supabase
+    .from('acudientes')
+    .update(formData)
+    .eq('id', editingGuardian.id)
+
+  if (error) throw error
+
+  setFormSuccess('Acudiente actualizado correctamente.')
+}
+
+await fetchGuardians()
+
+// ✅ Mostrar el mensaje unos segundos y luego cerrar el formulario
+setTimeout(() => {
+  setFormSuccess('')
+  resetForm()
+}, 2000) // Mostrar el mensaje 2 segundos
+
+    await fetchGuardians()
+    resetForm()
+  } catch (error) {
+    console.error('Error saving guardian:', error)
+    setFormError('Ocurrió un error al guardar el acudiente.')
+  }
+}
+
+
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Está seguro de eliminar este acudiente? Esto también eliminará todas sus relaciones con los niños.')) return
@@ -435,6 +469,20 @@ const fetchGuardians = async () => {
                 {editingGuardian ? 'Editar Acudiente' : 'Nuevo Acudiente'}
               </h2>
               
+            {formError && (
+              <div className="mb-4 p-3 rounded bg-red-100 text-red-700 border border-red-300">
+                {formError}
+              </div>
+            )}
+
+            {formSuccess && (
+                <div className="mb-4 p-3 rounded bg-green-100 text-green-700 border border-green-300">
+                  {formSuccess}
+                </div>
+              )}
+
+
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>

@@ -8,7 +8,8 @@ import {
   QrCode, 
   BarChart3, 
   LogOut,
-  Settings
+  Settings,
+  CalendarSearch
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useDaycareConfig } from '../../hooks/useDaycareConfig'
@@ -52,6 +53,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     const commonItems = [
       { id: 'dashboard', label: 'Dashboard', icon: Home },
       { id: 'attendance', label: 'Asistencia', icon: UserCheck },
+      { id: 'attendance-summary', label: 'Registro Personalizado', icon: CalendarSearch }, // 👈 nuevo
       { id: 'qr-scanner', label: 'Escáner QR', icon: QrCode },
       { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
       { id: 'settings', label: 'Configuración', icon: Settings }
