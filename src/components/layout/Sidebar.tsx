@@ -14,12 +14,14 @@ import {
 import { useAuth } from '../../hooks/useAuth'
 import { useDaycareConfig } from '../../hooks/useDaycareConfig'
 
+
 interface SidebarProps {
   activeTab: string
   setActiveTab: (tab: string) => void
 }
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const appVersion = import.meta.env.VITE_APP_VERSION
   const { user, signOut } = useAuth()
   const { daycareNombre } = useDaycareConfig()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -162,6 +164,10 @@ const menuItems = getMenuItems()
             </>
           )}
         </button>
+          <p className="text-center text-[11px] text-gray-400 mt-4">
+            Versión {appVersion}
+          </p>
+
       </div>
     </div>
   )
