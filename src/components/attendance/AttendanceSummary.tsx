@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
+
 
 export function AttendanceSummary() {
+  const { user } = useAuth()
   const [selectedChild, setSelectedChild] = useState<any>(null)
   const [showModal, setShowModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -17,16 +20,21 @@ export function AttendanceSummary() {
   const itemsPerPage = 10
 
   useEffect(() => {
+  if (user?.guarderia_id) {
     fetchAbsentChildrenForDate(selectedDate)
-  }, [selectedDate])
+  }
+}, [selectedDate, user?.guarderia_id])
+
 
   const fetchAbsentChildrenForDate = async (date: Date) => {
     const fecha = date.toISOString().split('T')[0]
 
     const { data: allChildren } = await supabase
-      .from('ninos')
-      .select('id, nombres, apellidos')
-      .eq('activo', true)
+    .from('ninos')
+    .select('id, nombres, apellidos')
+    .eq('activo', true)
+    .eq('guarderia_id', user?.guarderia_id)
+
 
     const { data: attendanceToday } = await supabase
       .from('registros_asistencia')

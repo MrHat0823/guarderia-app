@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, School, Users } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Aula, User } from '../../lib/types'
+import { useAuth } from '../../hooks/useAuth'
 
 export function ClassroomManagement() {
+  const { user } = useAuth()
   const [aulas, setAulas] = useState<Aula[]>([])
   const [teachers, setTeachers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,17 +20,22 @@ export function ClassroomManagement() {
   })
 
   useEffect(() => {
-    Promise.all([loadAulas(), loadTeachers()])
-  }, [])
+    if (user?.guarderia_id) {
+      Promise.all([loadAulas(), loadTeachers()])
+    }
+  }, [user])
 
   const loadAulas = async () => {
     try {
+      if (!user?.guarderia_id) return
+
       const { data, error } = await supabase
         .from('aulas')
         .select(`
           *,
           profesor:users(nombres, apellidos, telefono)
         `)
+        .eq('guarderia_id', user.guarderia_id) // ← Filtro agregado
         .order('nombre_aula')
 
       if (error) throw error
@@ -42,10 +49,13 @@ export function ClassroomManagement() {
 
   const loadTeachers = async () => {
     try {
+      if (!user?.guarderia_id) return
+
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('rol', 'profesor')
+        .eq('guarderia_id', user.guarderia_id) // ← Filtro agregado
         .order('nombres')
 
       if (error) throw error
@@ -60,12 +70,17 @@ export function ClassroomManagement() {
     setLoading(true)
 
     try {
+      if (!user?.guarderia_id) {
+        throw new Error('Guardería no disponible para el usuario actual')
+      }
+
       const aulaData = {
         nombre_aula: formData.nombre_aula,
         nivel_educativo: formData.nivel_educativo,
         numero_aula: formData.numero_aula,
         capacidad: formData.capacidad,
-        profesor_asignado_id: formData.profesor_asignado_id || null
+        profesor_asignado_id: formData.profesor_asignado_id || null,
+        guarderia_id: user.guarderia_id // ← Fijar la guardería automáticamente
       }
 
       if (editingAula) {
@@ -135,7 +150,6 @@ export function ClassroomManagement() {
       </div>
     )
   }
-
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-8">

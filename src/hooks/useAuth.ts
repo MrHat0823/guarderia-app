@@ -121,13 +121,13 @@ export function useAuth() {
   nombres: string
   apellidos: string
   password: string
-  rol: 'admin' | 'profesor' | 'portero'
+  rol: 'admin' | 'profesor' | 'portero' | 'coordinador'
   tipo_documento: string
   numero_documento: string
   telefono?: string
+  guarderia_id: string // ✅ NUEVO campo obligatorio
 }) => {
   try {
-    // Hashear la contraseña antes de insertarla
     const hashedPassword = await bcrypt.hash(userData.password, 10)
 
     const { data, error } = await supabase
@@ -135,11 +135,12 @@ export function useAuth() {
       .insert({
         nombres: userData.nombres,
         apellidos: userData.apellidos,
-        password: hashedPassword, // Aquí se guarda el hash, no la contraseña en texto plano
+        password: hashedPassword,
         rol: userData.rol,
         tipo_documento: userData.tipo_documento,
         numero_documento: userData.numero_documento,
-        telefono: userData.telefono
+        telefono: userData.telefono,
+        guarderia_id: userData.guarderia_id // ✅ Inserción aquí
       })
       .select()
       .single()
@@ -151,6 +152,7 @@ export function useAuth() {
     throw error
   }
 }
+
 
 
   return {

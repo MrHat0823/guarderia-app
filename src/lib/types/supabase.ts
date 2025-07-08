@@ -10,6 +10,7 @@ export interface Database {
           tipo_documento: string
           numero_documento: string
           telefono: string | null
+          guarderia_id: string // 👈 Añade este campo
           created_at: string
           updated_at: string
         }
@@ -21,6 +22,7 @@ export interface Database {
           tipo_documento: string
           numero_documento: string
           telefono?: string | null
+          guarderia_id: string // 👈 Añade este campo
           created_at?: string
           updated_at?: string
         }
@@ -32,6 +34,7 @@ export interface Database {
           tipo_documento?: string
           numero_documento?: string
           telefono?: string | null
+           guarderia_id?: string // 👈 Añade este campo
           created_at?: string
           updated_at?: string
         }

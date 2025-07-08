@@ -49,31 +49,41 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     }
   }
 
-  const getMenuItems = () => {
-    const commonItems = [
-      { id: 'dashboard', label: 'Dashboard', icon: Home },
-      { id: 'attendance', label: 'Asistencia', icon: UserCheck },
-      { id: 'attendance-summary', label: 'Registro Personalizado', icon: CalendarSearch }, // 👈 nuevo
-      { id: 'qr-scanner', label: 'Escáner QR', icon: QrCode },
-      { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
-      { id: 'settings', label: 'Configuración', icon: Settings }
-    ]
+const getMenuItems = () => {
+  const commonItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: Home },
+    { id: 'attendance-summary', label: 'Registro Personalizado', icon: CalendarSearch },
+    { id: 'statistics', label: 'Estadísticas', icon: BarChart3 }
+  ]
 
-    const adminItems = [
-      { id: 'users', label: 'Usuarios', icon: Users },
-      { id: 'children', label: 'Niños', icon: Baby },
-      { id: 'guardians', label: 'Acudientes', icon: Users },
-      { id: 'classrooms', label: 'Aulas', icon: School }
-    ]
+  const adminItems = [
+    { id: 'users', label: 'Usuarios', icon: Users },
+    { id: 'children', label: 'Niños', icon: Baby },
+    { id: 'guardians', label: 'Acudientes', icon: Users },
+    { id: 'classrooms', label: 'Aulas', icon: School }
+  ]
 
-    if (user?.rol === 'admin') {
-      return [...commonItems, ...adminItems]
-    }
-
-    return commonItems
+  if (user?.rol === 'admin') {
+    return [...commonItems, ...adminItems]
   }
 
-  const menuItems = getMenuItems()
+ if (user?.rol === 'coordinador') {
+  return [
+    { id: 'dashboard', label: 'Dashboard', icon: Home },
+    { id: 'attendance-summary', label: 'Registro Personalizado', icon: CalendarSearch },
+    { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
+    { id: 'guarderias', label: 'Gestión de Guarderías', icon: School }
+  ]
+}
+
+
+  return commonItems
+}
+
+
+// ✅ ESTA LÍNEA DEBE ESTAR FUERA
+const menuItems = getMenuItems()
+
 
   if (!user) {
     return null

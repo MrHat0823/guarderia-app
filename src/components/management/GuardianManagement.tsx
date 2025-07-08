@@ -3,6 +3,8 @@ import { Plus, Edit2, Trash2, Users, Phone, Mail, MapPin, Link, Heart, QrCode, D
 import { supabase } from '../../lib/supabase'
 import type { Acudiente, Nino, TipoParentesco } from '../../lib/types'
 import QRCode from 'qrcode'
+import { useAuth } from '../../hooks/useAuth'
+
 
 interface ChildWithRelationship {
   id: string
@@ -20,7 +22,7 @@ interface ChildWithRelationship {
 export function GuardianManagement() {
   const [formError, setFormError] = useState('')
   const [formSuccess, setFormSuccess] = useState('')
-
+  const { user } = useAuth()
   const [guardians, setGuardians] = useState<Acudiente[]>([])
   const [children, setChildren] = useState<Nino[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -56,12 +58,17 @@ export function GuardianManagement() {
   ]
 
 useEffect(() => {
-  fetchGuardians()
-}, [currentPage]) // solo para la paginación
+  if (user?.guarderia_id) {
+    fetchGuardians()
+  }
+}, [currentPage, user])
 
 useEffect(() => {
-  fetchChildren()
-}, []) // solo una vez al cargar el componente
+  if (user?.guarderia_id) {
+    fetchChildren()
+  }
+}, [user]) // 👈 Se ejecuta cuando `user` esté listo
+
 
 const filteredGuardians = guardians.filter((g) => {
   const fullName = `${g.nombres} ${g.apellidos}`.toLowerCase()
@@ -84,6 +91,7 @@ const fetchGuardians = async () => {
     const { data, count, error } = await supabase
       .from('acudientes')
       .select('*', { count: 'exact' })
+      .eq('guarderia_id', user?.guarderia_id) // ✅ filtro agregado
       .order('nombres')
       .range(from, to)
 
@@ -98,65 +106,73 @@ const fetchGuardians = async () => {
 }
 
 
+
   const fetchChildren = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('ninos')
-        .select(`
-          *,
+  try {
+    const { data, error } = await supabase
+      .from('ninos')
+      .select(`
+        *,
+        aulas (
+          nombre_aula,
+          nivel_educativo
+        )
+      `)
+      .eq('activo', true)
+      .eq('guarderia_id', user?.guarderia_id) // ✅ filtro agregado
+      .order('nombres')
+
+    if (error) throw error
+    setChildren(data || [])
+  } catch (error) {
+    console.error('Error fetching children:', error)
+  }
+}
+
+
+  const fetchChildrenForGuardian = async (guardianId: string): Promise<ChildWithRelationship[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('nino_acudiente')
+      .select(`
+        parentesco,
+        ninos (
+          id,
+          nombres,
+          apellidos,
+          numero_documento,
+          tipo_documento,
           aulas (
             nombre_aula,
             nivel_educativo
           )
-        `)
-        .eq('activo', true)
-        .order('nombres')
-      
-      if (error) throw error
-      setChildren(data || [])
-    } catch (error) {
-      console.error('Error fetching children:', error)
-    }
-  }
+        )
+      `)
+      .eq('acudiente_id', guardianId)
 
-  const fetchChildrenForGuardian = async (guardianId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('nino_acudiente')
-        .select(`
-          parentesco,
-          ninos (
-            id,
-            nombres,
-            apellidos,
-            numero_documento,
-            tipo_documento,
-            aulas (
-              nombre_aula,
-              nivel_educativo
-            )
-          )
-        `)
-        .eq('acudiente_id', guardianId)
+    if (error) throw error
 
-      if (error) throw error
-      
-      const childrenWithRelationship = data?.map(item => ({
-        id: item.ninos.id,
-        nombres: item.ninos.nombres,
-        apellidos: item.ninos.apellidos,
-        numero_documento: item.ninos.numero_documento,
-        tipo_documento: item.ninos.tipo_documento,
+    const childrenWithRelationship = (data ?? []).map(item => {
+      const nino = item.ninos
+      return {
+        id: nino.id,
+        nombres: nino.nombres,
+        apellidos: nino.apellidos,
+        numero_documento: nino.numero_documento,
+        tipo_documento: nino.tipo_documento,
         parentesco: item.parentesco,
-        aula: item.ninos.aulas
-      })) || []
+        aula: Array.isArray(nino.aulas) ? nino.aulas[0] : nino.aulas
+      }
+    })
 
-      return childrenWithRelationship
-    } catch (error) {
-      console.error('Error fetching children for guardian:', error)
-      return []
-    }
+    return childrenWithRelationship
+  } catch (error) {
+    console.error('Error fetching children for guardian:', error)
+    return []
   }
+}
+
+
 
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault()
@@ -164,54 +180,59 @@ const handleSubmit = async (e: React.FormEvent) => {
   setFormSuccess('')
 
   try {
-   if (!editingGuardian) {
-  // Verificar si ya existe ese número de documento
-  const { data: existing, error: existingError } = await supabase
-    .from('acudientes')
-    .select('id')
-    .eq('numero_documento', formData.numero_documento)
-    .maybeSingle()
+    if (!user?.guarderia_id) {
+      setFormError('No se puede guardar el acudiente porque no se encontró una guardería asociada al usuario actual.')
+      return
+    }
 
-  if (existingError) throw existingError
+    if (!editingGuardian) {
+      // Verificar si ya existe ese número de documento
+      const { data: existing, error: existingError } = await supabase
+        .from('acudientes')
+        .select('id')
+        .eq('numero_documento', formData.numero_documento)
+        .maybeSingle()
 
-  if (existing) {
-    setFormError('Ya existe un acudiente con ese número de documento.')
-    return
-  }
+      if (existingError) throw existingError
 
-  const { error } = await supabase
-    .from('acudientes')
-    .insert([formData])
+      if (existing) {
+        setFormError('Ya existe un acudiente con ese número de documento.')
+        return
+      }
 
-  if (error) throw error
+      const { error } = await supabase
+        .from('acudientes')
+        .insert([{
+          ...formData,
+          guarderia_id: user.guarderia_id  // ✅ se asigna automáticamente
+        }])
 
-  setFormSuccess('Acudiente creado correctamente.')
-} else {
-  const { error } = await supabase
-    .from('acudientes')
-    .update(formData)
-    .eq('id', editingGuardian.id)
+      if (error) throw error
 
-  if (error) throw error
+      setFormSuccess('Acudiente creado correctamente.')
+    } else {
+      const { error } = await supabase
+        .from('acudientes')
+        .update(formData)
+        .eq('id', editingGuardian.id)
 
-  setFormSuccess('Acudiente actualizado correctamente.')
-}
+      if (error) throw error
 
-await fetchGuardians()
-
-// ✅ Mostrar el mensaje unos segundos y luego cerrar el formulario
-setTimeout(() => {
-  setFormSuccess('')
-  resetForm()
-}, 2000) // Mostrar el mensaje 2 segundos
+      setFormSuccess('Acudiente actualizado correctamente.')
+    }
 
     await fetchGuardians()
-    resetForm()
+
+    setTimeout(() => {
+      setFormSuccess('')
+      resetForm()
+    }, 2000)
   } catch (error) {
     console.error('Error saving guardian:', error)
     setFormError('Ocurrió un error al guardar el acudiente.')
   }
 }
+
 
 
 
@@ -297,37 +318,34 @@ setTimeout(() => {
     )
   }
 
-  const handleLinkChildren = async () => {
-    if (!selectedGuardian || selectedChildrenWithParentesco.length === 0) return
-    
-    try {
-      // Eliminar relaciones existentes
-      await supabase
-        .from('nino_acudiente')
-        .delete()
-        .eq('acudiente_id', selectedGuardian.id)
+const handleLinkChildren = async () => {
+  if (!selectedGuardian || selectedChildrenWithParentesco.length === 0) return
 
-      // Crear nuevas relaciones
-      const relationships = selectedChildrenWithParentesco.map(item => ({
-        nino_id: item.childId,
-        acudiente_id: selectedGuardian.id,
-        parentesco: item.parentesco
-      }))
-      
-      const { error } = await supabase
-        .from('nino_acudiente')
-        .insert(relationships)
-      
-      if (error) throw error
-      
-      setShowLinkForm(false)
-      setSelectedGuardian(null)
-      setSelectedChildrenWithParentesco([])
-      setChildSearchTerm('')
-    } catch (error) {
-      console.error('Error linking children:', error)
-    }
+  try {
+    const relationships = selectedChildrenWithParentesco.map(item => ({
+      nino_id: item.childId,
+      acudiente_id: selectedGuardian.id,
+      parentesco: item.parentesco
+    }))
+
+    // Insertar nuevas relaciones, evitando duplicados (clave única nino_id + acudiente_id)
+    const { error } = await supabase
+      .from('nino_acudiente')
+      .upsert(relationships, {
+        onConflict: 'nino_id,acudiente_id' // ⚠️ Usa la constraint única que ya definiste
+      })
+
+    if (error) throw error
+
+    setShowLinkForm(false)
+    setSelectedGuardian(null)
+    setSelectedChildrenWithParentesco([])
+    setChildSearchTerm('')
+  } catch (error) {
+    console.error('Error linking children:', error)
   }
+}
+
 
   const filteredChildren = children.filter(child =>
     `${child.nombres} ${child.apellidos}`.toLowerCase().includes(childSearchTerm.toLowerCase()) ||

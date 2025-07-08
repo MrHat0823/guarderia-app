@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react'
-import { 
-  BarChart3, 
-  Calendar, 
-  Users, 
-  TrendingUp, 
-  Clock, 
-  Baby, 
+import { toZonedTime } from 'date-fns-tz'
+import { format, subDays, parseISO, startOfWeek, endOfWeek } from 'date-fns'
+
+
+import {
+  BarChart3,
+  Calendar,
+  Users,
+  TrendingUp,
+  Clock,
+  Baby,
   Search,
   User,
   Shield,
@@ -14,8 +18,9 @@ import {
   Filter
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { format, subDays, startOfWeek, endOfWeek } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useAuth } from '../../hooks/useAuth'
+
 
 interface AttendanceRecord {
   id: string
@@ -69,15 +74,13 @@ interface UserStats {
 export function Statistics() {
   const [activeSection, setActiveSection] = useState<'overview' | 'children' | 'users'>('overview')
   const [loading, setLoading] = useState(true)
-  const [dateRange, setDateRange] = useState('week')
-  
-  // Search states
+  const { user } = useAuth()
+
   const [childSearch, setChildSearch] = useState('')
   const [userSearch, setUserSearch] = useState('')
   const [selectedChild, setSelectedChild] = useState<ChildStats | null>(null)
   const [selectedUser, setSelectedUser] = useState<UserStats | null>(null)
-  
-  // Data states
+
   const [overviewStats, setOverviewStats] = useState({
     totalRegistros: 0,
     totalEntradas: 0,
@@ -89,27 +92,22 @@ export function Statistics() {
   const [selectedHistory, setSelectedHistory] = useState<AttendanceRecord[]>([])
 
   useEffect(() => {
-    loadStatistics()
-  }, [dateRange])
+    if (user?.guarderia_id) {
+      loadStatistics()
+    }
+  }, [user])
 
   const loadStatistics = async () => {
     try {
       setLoading(true)
-      
-      const today = new Date()
-      const startDate = dateRange === 'week' 
-        ? startOfWeek(today, { locale: es })
-        : subDays(today, dateRange === 'month' ? 30 : 7)
-      
-      const endDate = dateRange === 'week' 
-        ? endOfWeek(today, { locale: es })
-        : today
+
 
       await Promise.all([
-        loadOverviewStats(startDate, endDate),
-        loadChildrenStats(startDate, endDate),
-        loadUsersStats(startDate, endDate)
+        loadOverviewStats(),
+        loadChildrenStats(),
+        loadUsersStats()
       ])
+
     } catch (error) {
       console.error('Error loading statistics:', error)
     } finally {
@@ -117,19 +115,20 @@ export function Statistics() {
     }
   }
 
-  const loadOverviewStats = async (startDate: Date, endDate: Date) => {
+  const loadOverviewStats = async () => {
+
     const { data, error } = await supabase
       .from('registros_asistencia')
-      .select('fecha, tipo')
-      .gte('fecha', format(startDate, 'yyyy-MM-dd'))
-      .lte('fecha', format(endDate, 'yyyy-MM-dd'))
-
+      .select('fecha, tipo, usuario_registra:users(guarderia_id)')
+      
     if (error) throw error
 
-    const totalRegistros = data.length
-    const totalEntradas = data.filter(r => r.tipo === 'entrada').length
-    const totalSalidas = data.filter(r => r.tipo === 'salida').length
-    const diasActivos = new Set(data.map(r => r.fecha)).size
+    const filtered = data.filter(r => r.usuario_registra?.guarderia_id === user?.guarderia_id)
+
+    const totalRegistros = filtered.length
+    const totalEntradas = filtered.filter(r => r.tipo === 'entrada').length
+    const totalSalidas = filtered.filter(r => r.tipo === 'salida').length
+    const diasActivos = new Set(filtered.map(r => r.fecha)).size
 
     setOverviewStats({
       totalRegistros,
@@ -139,105 +138,110 @@ export function Statistics() {
     })
   }
 
-  const loadChildrenStats = async (startDate: Date, endDate: Date) => {
+  const loadChildrenStats = async () => {
+
+  const { data, error } = await supabase
+    .from('registros_asistencia')
+    .select(`
+      id,
+      fecha,
+      tipo,
+      nino_id,
+      ninos (
+        id,
+        nombres,
+        apellidos,
+        numero_documento,
+        aulas (
+          nombre_aula,
+          nivel_educativo
+        )
+      ),
+      usuario_registra:users(guarderia_id)
+    `)
+
+  if (error) throw error
+
+  const filtered = data.filter(r => r.usuario_registra?.guarderia_id === user?.guarderia_id)
+
+  const childStats = filtered.reduce((acc, record) => {
+    const child = record.ninos
+    if (!child) return acc
+
+    if (!acc[child.id]) {
+      acc[child.id] = {
+        id: child.id,
+        nombres: child.nombres,
+        apellidos: child.apellidos,
+        numero_documento: child.numero_documento,
+        aula: child.aulas,
+        total_registros: 0,
+        entradas: 0,
+        salidas: 0,
+        ultimo_registro: record.fecha
+      }
+    }
+
+    acc[child.id].total_registros++
+    if (record.tipo === 'entrada') {
+      acc[child.id].entradas++
+    } else if (record.tipo === 'salida') {
+      acc[child.id].salidas++
+    }
+
+    if (record.fecha > acc[child.id].ultimo_registro!) {
+      acc[child.id].ultimo_registro = record.fecha
+    }
+
+    return acc
+  }, {} as Record<string, ChildStats>)
+
+  setChildrenStats(Object.values(childStats).sort((a, b) => b.total_registros - a.total_registros))
+}
+
+
+  const loadUsersStats = async () => {
+
     const { data, error } = await supabase
       .from('registros_asistencia')
       .select(`
-        tipo,
         fecha,
-        ninos (
+        usuario_registra:users (
           id,
           nombres,
           apellidos,
           numero_documento,
-          aulas (
-            nombre_aula,
-            nivel_educativo
-          )
+          rol,
+          guarderia_id
         )
       `)
-      .gte('fecha', format(startDate, 'yyyy-MM-dd'))
-      .lte('fecha', format(endDate, 'yyyy-MM-dd'))
 
     if (error) throw error
 
-    const childStats = data.reduce((acc, record) => {
-      const child = record.ninos
-      if (!child) return acc
+    const filtered = data.filter(r => r.usuario_registra?.guarderia_id === user?.guarderia_id)
 
-      if (!acc[child.id]) {
-        acc[child.id] = {
-          id: child.id,
-          nombres: child.nombres,
-          apellidos: child.apellidos,
-          numero_documento: child.numero_documento,
-          aula: child.aulas,
-          total_registros: 0,
-          entradas: 0,
-          salidas: 0,
-          ultimo_registro: record.fecha
-        }
-      }
+    const userStats = filtered.reduce((acc, record) => {
+      const userRegistra = record.usuario_registra
+      if (!userRegistra) return acc
 
-      acc[child.id].total_registros++
-      if (record.tipo === 'entrada') {
-        acc[child.id].entradas++
-      } else {
-        acc[child.id].salidas++
-      }
-
-      // Update last record date
-      if (record.fecha > acc[child.id].ultimo_registro!) {
-        acc[child.id].ultimo_registro = record.fecha
-      }
-
-      return acc
-    }, {} as Record<string, ChildStats>)
-
-    setChildrenStats(Object.values(childStats).sort((a, b) => b.total_registros - a.total_registros))
-  }
-
-  const loadUsersStats = async (startDate: Date, endDate: Date) => {
-    const { data, error } = await supabase
-      .from('registros_asistencia')
-      .select(`
-        fecha,
-        users (
-          id,
-          nombres,
-          apellidos,
-          numero_documento,
-          rol
-        )
-      `)
-      .gte('fecha', format(startDate, 'yyyy-MM-dd'))
-      .lte('fecha', format(endDate, 'yyyy-MM-dd'))
-
-    if (error) throw error
-
-    const userStats = data.reduce((acc, record) => {
-      const user = record.users
-      if (!user) return acc
-
-      if (!acc[user.id]) {
-        acc[user.id] = {
-          id: user.id,
-          nombres: user.nombres,
-          apellidos: user.apellidos,
-          numero_documento: user.numero_documento,
-          rol: user.rol,
+      if (!acc[userRegistra.id]) {
+        acc[userRegistra.id] = {
+          id: userRegistra.id,
+          nombres: userRegistra.nombres,
+          apellidos: userRegistra.apellidos,
+          numero_documento: userRegistra.numero_documento,
+          rol: userRegistra.rol,
           total_registros: 0,
           dias_trabajados: new Set(),
           ultimo_registro: record.fecha
         }
       }
 
-      acc[user.id].total_registros++
-      acc[user.id].dias_trabajados.add(record.fecha)
+      acc[userRegistra.id].total_registros++
+      acc[userRegistra.id].dias_trabajados.add(record.fecha)
 
-      // Update last record date
-      if (record.fecha > acc[user.id].ultimo_registro!) {
-        acc[user.id].ultimo_registro = record.fecha
+      if (record.fecha > acc[userRegistra.id].ultimo_registro!) {
+        acc[userRegistra.id].ultimo_registro = record.fecha
       }
 
       return acc
@@ -252,47 +256,60 @@ export function Statistics() {
   }
 
   const loadHistory = async (type: 'child' | 'user', id: string) => {
-    const today = new Date()
-    const startDate = subDays(today, 30) // Last 30 days
+  const today = new Date()
+  const startDate = subDays(today, 30)
 
-    const { data, error } = await supabase
-      .from('registros_asistencia')
-      .select(`
-        id,
-        fecha,
-        hora,
-        tipo,
-        anotacion,
-        ninos (
-          nombres,
-          apellidos,
-          numero_documento
-        ),
-        acudientes (
-          nombres,
-          apellidos,
-          numero_documento
-        ),
-        usuario_registra:users!registros_asistencia_usuario_registra_id_fkey (
-          nombres,
-          apellidos,
-          rol
-        )
-      `)
-      .eq(type === 'child' ? 'nino_id' : 'usuario_registra_id', id)
-      .gte('fecha', format(startDate, 'yyyy-MM-dd'))
-      .order('fecha', { ascending: false })
-      .order('hora', { ascending: false })
+  const { data, error } = await supabase
+    .from('registros_asistencia')
+    .select(`
+      id,
+      fecha,
+      hora,
+      tipo,
+      anotacion,
+      ninos (
+        nombres,
+        apellidos,
+        numero_documento
+      ),
+      acudientes (
+        nombres,
+        apellidos,
+        numero_documento
+      ),
+      usuario_registra:users!registros_asistencia_usuario_registra_id_fkey (
+        nombres,
+        apellidos,
+        rol,
+        guarderia_id
+      )
+    `)
+    .eq(type === 'child' ? 'nino_id' : 'usuario_registra_id', id)
+    .gte('fecha', format(startDate, 'yyyy-MM-dd'))
+    .order('fecha', { ascending: false })
+    .order('hora', { ascending: false })
 
-    if (error) {
-      console.error('Error loading history:', error)
-      setSelectedHistory([])
-      return
-    }
-
-    console.log('Historial cargado:', data)
-    setSelectedHistory(data || [])
+  if (error) {
+    console.error('Error loading history:', error)
+    setSelectedHistory([])
+    return
   }
+
+  const filtered = (data || []).filter(record =>
+    record.usuario_registra?.guarderia_id === user?.guarderia_id
+  ).map(record => {
+    const utcDate = parseISO(record.fecha) // <- este paso es crucial
+    const zonedDate = toZonedTime(utcDate, 'America/Bogota')
+    return {
+      ...record,
+      fecha: format(zonedDate, 'dd/MM/yyyy')
+    }
+  })
+
+  setSelectedHistory(filtered)
+}
+
+
 
   const handleChildSelect = async (child: ChildStats) => {
     setSelectedChild(child)
@@ -347,6 +364,7 @@ export function Statistics() {
     )
   }
 
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-8">
@@ -359,15 +377,6 @@ export function Statistics() {
           </p>
         </div>
         <div className="flex gap-2">
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint-500 focus:border-mint-500"
-          >
-            <option value="week">Esta semana</option>
-            <option value="month">Este mes</option>
-            <option value="year">Este año</option>
-          </select>
         </div>
       </div>
 

@@ -69,7 +69,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return () => clearInterval(timer)
   }, [])
 
-  useEffect(() => {
+ useEffect(() => {
+  if (user?.guarderia_id) {
     const initializeData = async () => {
       setInitialLoading(true)
       await Promise.all([
@@ -78,293 +79,225 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       ])
       setInitialLoading(false)
     }
-    
+
     initializeData()
-    
-    // Actualizar cada 30 segundos (sin mostrar loading completo)
+
     const interval = setInterval(() => {
-      loadStats(false) // false = no es carga inicial
+      loadStats(false)
       loadChildrenInFacility()
     }, 30000)
 
     return () => clearInterval(interval)
-    
-  }, [])
+  }
+}, [user?.guarderia_id])
+
 
   const loadStats = async (isInitial = false) => {
-    if (isInitial) {
-      setInitialLoading(true)
-    } else {
-      setRefreshing(true)
+  if (isInitial) {
+    setInitialLoading(true)
+  } else {
+    setRefreshing(true)
+  }
+
+  try {
+    console.log('Dashboard - Iniciando carga de estadísticas')
+
+    // Prueba de conexión
+    const { error: connectionError } = await supabase
+      .from('users')
+      .select('id', { head: true })
+
+    if (connectionError) {
+      throw new Error(`Error de conexión a la base de datos: ${connectionError.message}`)
     }
-    
-    try {
-      console.log('Dashboard - Iniciando carga de estadísticas')
-      
-      // Test basic connection first
-      console.log('Dashboard - Probando conexión a Supabase...')
-      const { data: connectionTest, error: connectionError } = await supabase
-        .from('users')
-        .select('count', { count: 'exact', head: true })
-        .limit(1)
-      
-      if (connectionError) {
-        console.error('Dashboard - Error de conexión:', connectionError)
-        throw new Error(`Error de conexión a la base de datos: ${connectionError.message}`)
-      }
-      
-      console.log('Dashboard - Conexión exitosa')
-      
-      // Obtener la fecha actual del sistema
-      const now = new Date()
-      const today = format(now, 'yyyy-MM-dd')
-      
-      console.log('Dashboard - Fecha de hoy:', today)
-      console.log('Dashboard - Fecha completa:', now.toISOString())
-      console.log('Dashboard - Timezone offset:', now.getTimezoneOffset())
 
-      // Get total children
-      console.log('Dashboard - Obteniendo total de niños...')
-      const { count: totalNinos, error: totalNinosError } = await supabase
-        .from('ninos')
-        .select('*', { count: 'exact', head: true })
+    const now = new Date()
+    const today = format(now, 'yyyy-MM-dd')
 
-      if (totalNinosError) {
-        console.error('Dashboard - Error al obtener total niños:', totalNinosError)
-        throw new Error(`Error al obtener total de niños: ${totalNinosError.message}`)
-      } else {
-        console.log('Dashboard - Total niños:', totalNinos)
-      }
+    // Total de niños en esta guardería
+    const { count: totalNinos } = await supabase
+      .from('ninos')
+      .select('*', { count: 'exact', head: true })
+      .eq('guarderia_id', user?.guarderia_id)
 
-      // Get active children
-      console.log('Dashboard - Obteniendo niños activos...')
-      const { count: ninosActivos, error: ninosActivosError } = await supabase
-        .from('ninos')
-        .select('*', { count: 'exact', head: true })
-        .eq('activo', true)
+    // Niños activos en esta guardería
+    const { count: ninosActivos } = await supabase
+      .from('ninos')
+      .select('*', { count: 'exact', head: true })
+      .eq('activo', true)
+      .eq('guarderia_id', user?.guarderia_id)
 
-      if (ninosActivosError) {
-        console.error('Dashboard - Error al obtener niños activos:', ninosActivosError)
-        throw new Error(`Error al obtener niños activos: ${ninosActivosError.message}`)
-      } else {
-        console.log('Dashboard - Niños activos:', ninosActivos)
-      }
+    // Asistencia de hoy en esta guardería
+    const { count: asistenciaHoy } = await supabase
+      .from('registros_asistencia')
+      .select('*', { count: 'exact', head: true })
+      .eq('fecha', today)
+      .eq('guarderia_id', user?.guarderia_id)
 
-      // Get today's attendance
-      console.log('Dashboard - Obteniendo asistencia de hoy...')
-      const { count: asistenciaHoy, error: asistenciaError } = await supabase
-        .from('registros_asistencia')
-        .select('*', { count: 'exact', head: true })
-        .eq('fecha', today)
+    // Entradas de hoy
+    const { count: totalEntradas } = await supabase
+      .from('registros_asistencia')
+      .select('*', { count: 'exact', head: true })
+      .eq('fecha', today)
+      .eq('tipo', 'entrada')
+      .eq('guarderia_id', user?.guarderia_id)
 
-      if (asistenciaError) {
-        console.error('Dashboard - Error al obtener asistencia hoy:', asistenciaError)
-        throw new Error(`Error al obtener asistencia de hoy: ${asistenciaError.message}`)
-      } else {
-        console.log('Dashboard - Asistencia hoy:', asistenciaHoy)
-      }
+    // Salidas de hoy
+    const { count: totalSalidas } = await supabase
+      .from('registros_asistencia')
+      .select('*', { count: 'exact', head: true })
+      .eq('fecha', today)
+      .eq('tipo', 'salida')
+      .eq('guarderia_id', user?.guarderia_id)
 
-      // Get today's entries
-      console.log('Dashboard - Obteniendo entradas de hoy...')
-      const { count: totalEntradas, error: entradasError } = await supabase
-        .from('registros_asistencia')
-        .select('*', { count: 'exact', head: true })
-        .eq('fecha', today)
-        .eq('tipo', 'entrada')
+    // Actualizar estado
+    setStats({
+      totalNinos: totalNinos ?? 0,
+      ninosActivos: ninosActivos ?? 0,
+      asistenciaHoy: asistenciaHoy ?? 0,
+      totalEntradas: totalEntradas ?? 0,
+      totalSalidas: totalSalidas ?? 0
+    })
 
-      if (entradasError) {
-        console.error('Dashboard - Error al obtener entradas:', entradasError)
-        throw new Error(`Error al obtener entradas: ${entradasError.message}`)
-      } else {
-        console.log('Dashboard - Total entradas hoy:', totalEntradas)
-      }
+  } catch (error) {
+    console.error('Dashboard - Error general en loadStats:', error)
 
-      // Get today's exits
-      console.log('Dashboard - Obteniendo salidas de hoy...')
-      const { count: totalSalidas, error: salidasError } = await supabase
-        .from('registros_asistencia')
-        .select('*', { count: 'exact', head: true })
-        .eq('fecha', today)
-        .eq('tipo', 'salida')
+    setStats({
+      totalNinos: 0,
+      ninosActivos: 0,
+      asistenciaHoy: 0,
+      totalEntradas: 0,
+      totalSalidas: 0
+    })
 
-      if (salidasError) {
-        console.error('Dashboard - Error al obtener salidas:', salidasError)
-        throw new Error(`Error al obtener salidas: ${salidasError.message}`)
-      } else {
-        console.log('Dashboard - Total salidas hoy:', totalSalidas)
-      }
+    if (error instanceof Error && error.message.includes('Failed to fetch')) {
+      console.error('Dashboard - Error de conectividad. Verifique su conexión a internet y la configuración de Supabase.')
+    }
 
-      const newStats = {
-        totalNinos: totalNinos || 0,
-        ninosActivos: ninosActivos || 0,
-        asistenciaHoy: asistenciaHoy || 0,
-        totalEntradas: totalEntradas || 0,
-        totalSalidas: totalSalidas || 0
-      }
-
-      console.log('Dashboard - Estadísticas finales:', newStats)
-      setStats(newStats)
-    } catch (error) {
-      console.error('Dashboard - Error general en loadStats:', error)
-      
-      // Set default stats on error
-      setStats({
-        totalNinos: 0,
-        ninosActivos: 0,
-        asistenciaHoy: 0,
-        totalEntradas: 0,
-        totalSalidas: 0
-      })
-      
-      // Show user-friendly error message
-      if (error instanceof Error) {
-        if (error.message.includes('Failed to fetch')) {
-          console.error('Dashboard - Error de conectividad. Verifique su conexión a internet y la configuración de Supabase.')
-        }
-      }
-    } finally {
-      if (isInitial) {
-        setInitialLoading(false)
-      } else {
-        setRefreshing(false)
-      }
+  } finally {
+    if (isInitial) {
+      setInitialLoading(false)
+    } else {
+      setRefreshing(false)
     }
   }
+}
+
 
   const loadChildrenInFacility = async () => {
-    try {
-      // Obtener la fecha actual del sistema
-      const now = new Date()
-      const today = format(now, 'yyyy-MM-dd')
-      
-      console.log('Dashboard - Cargando niños en plantel para fecha:', today)
-      console.log('Dashboard - Verificando registros en base de datos...')
-      
-      // Primero, verificar qué fechas existen en la base de datos
-      const { data: allDates, error: datesError } = await supabase
-        .from('registros_asistencia')
-        .select('fecha')
-        .order('fecha', { ascending: false })
-        .limit(10)
-      
-      if (datesError) {
-        console.error('Dashboard - Error al obtener fechas:', datesError)
-        throw new Error(`Error al obtener fechas: ${datesError.message}`)
-      } else {
-        console.log('Dashboard - Últimas 10 fechas en BD:', allDates?.map(d => d.fecha) || [])
-      }
+  try {
+    const now = new Date()
+    const today = format(now, 'yyyy-MM-dd')
 
-      // Obtener todos los registros de hoy ordenados por hora
-      const { data: todayRecords, error: recordsError } = await supabase
-        .from('registros_asistencia')
-        .select(`
-          nino_id,
-          tipo,
-          hora,
-          acudientes (
-            nombres,
-            apellidos
-          ),
-          ninos (
-            id,
-            nombres,
-            apellidos,
-            numero_documento,
-            aulas (
-              nombre_aula,
-              nivel_educativo
-            )
-          )
-        `)
-        .eq('fecha', today)
-        .order('hora', { ascending: true })
+    console.log('Dashboard - Cargando niños en plantel para fecha:', today)
 
-      if (recordsError) {
-        console.error('Dashboard - Error al obtener registros:', recordsError)
-        throw new Error(`Error al obtener registros: ${recordsError.message}`)
-      }
+    // Obtener últimas fechas de asistencia en esta guardería
+    const { data: allDates, error: datesError } = await supabase
+      .from('registros_asistencia')
+      .select('fecha')
+      .eq('guarderia_id', user?.guarderia_id)
+      .order('fecha', { ascending: false })
+      .limit(10)
 
-      console.log('Dashboard - Registros de hoy encontrados:', todayRecords?.length || 0)
-      console.log('Dashboard - Registros detallados:', todayRecords)
-
-      if (!todayRecords || todayRecords.length === 0) {
-        console.log('Dashboard - No hay registros para hoy')
-        setChildrenInFacility([])
-        return
-      }
-
-      // Procesar registros para determinar el estado actual de cada niño
-      const childrenStatus = new Map<string, {
-        child: any,
-        lastRecord: any,
-        isInFacility: boolean
-      }>()
-
-      // Procesar cada registro en orden cronológico
-      todayRecords.forEach(record => {
-        const ninoId = record.nino_id
-        const isEntrada = record.tipo === 'entrada'
-        
-        console.log(`Dashboard - Procesando registro: ${record.ninos?.nombres} ${record.ninos?.apellidos} - ${record.tipo} a las ${record.hora}`)
-        
-        if (!childrenStatus.has(ninoId)) {
-          childrenStatus.set(ninoId, {
-            child: record.ninos,
-            lastRecord: record,
-            isInFacility: isEntrada
-          })
-          console.log(`Dashboard - Nuevo niño agregado: ${record.ninos?.nombres} - Estado inicial: ${isEntrada ? 'en plantel' : 'fuera'}`)
-        } else {
-          // Actualizar con el registro más reciente
-          const current = childrenStatus.get(ninoId)!
-          if (record.hora > current.lastRecord.hora) {
-            current.lastRecord = record
-            current.isInFacility = isEntrada
-            console.log(`Dashboard - Actualizando estado de ${record.ninos?.nombres}: ${isEntrada ? 'en plantel' : 'fuera'} (hora: ${record.hora})`)
-          }
-        }
-      })
-
-      console.log('Dashboard - Estados procesados:', childrenStatus.size)
-
-      // Filtrar solo los niños que están actualmente en el plantel
-      const ninosEnPlantel: ChildInFacility[] = []
-      
-      childrenStatus.forEach((status, ninoId) => {
-        console.log(`Dashboard - Evaluando ${status.child?.nombres}: isInFacility = ${status.isInFacility}`)
-        
-        if (status.isInFacility) {
-          // Buscar el registro de entrada más reciente para obtener el acudiente
-          const entradaRecord = todayRecords
-            .filter(r => r.nino_id === ninoId && r.tipo === 'entrada')
-            .sort((a, b) => b.hora.localeCompare(a.hora))[0]
-
-          if (entradaRecord) {
-            const childData = {
-              id: status.child.id,
-              nombres: status.child.nombres,
-              apellidos: status.child.apellidos,
-              numero_documento: status.child.numero_documento,
-              hora_entrada: entradaRecord.hora,
-              acudiente_entrada: `${entradaRecord.acudientes.nombres} ${entradaRecord.acudientes.apellidos}`,
-              aula: status.child.aulas
-            }
-            
-            ninosEnPlantel.push(childData)
-            console.log(`Dashboard - Niño agregado a lista en plantel:`, childData)
-          }
-        }
-      })
-
-      console.log('Dashboard - Niños en plantel final:', ninosEnPlantel.length)
-      console.log('Dashboard - Lista final:', ninosEnPlantel.map(n => `${n.nombres} ${n.apellidos}`))
-
-      setChildrenInFacility(ninosEnPlantel)
-    } catch (error) {
-      console.error('Dashboard - Error loading children in facility:', error)
-      setChildrenInFacility([])
+    if (datesError) {
+      throw new Error(`Error al obtener fechas: ${datesError.message}`)
     }
+
+    console.log('Dashboard - Últimas 10 fechas en BD:', allDates?.map(d => d.fecha) || [])
+
+    // Obtener registros de hoy en esta guardería
+    const { data: todayRecords, error: recordsError } = await supabase
+      .from('registros_asistencia')
+      .select(`
+        nino_id,
+        tipo,
+        hora,
+        acudientes (
+          nombres,
+          apellidos
+        ),
+        ninos (
+          id,
+          nombres,
+          apellidos,
+          numero_documento,
+          guarderia_id,
+          aulas (
+            nombre_aula,
+            nivel_educativo
+          )
+        )
+      `)
+      .eq('fecha', today)
+      .eq('guarderia_id', user?.guarderia_id)
+      .order('hora', { ascending: true })
+
+    if (recordsError) {
+      throw new Error(`Error al obtener registros: ${recordsError.message}`)
+    }
+
+    if (!todayRecords || todayRecords.length === 0) {
+      console.log('Dashboard - No hay registros para hoy')
+      setChildrenInFacility([])
+      return
+    }
+
+    const childrenStatus = new Map<string, {
+      child: any,
+      lastRecord: any,
+      isInFacility: boolean
+    }>()
+
+    todayRecords.forEach(record => {
+      const ninoId = record.nino_id
+      const isEntrada = record.tipo === 'entrada'
+
+      if (!childrenStatus.has(ninoId)) {
+        childrenStatus.set(ninoId, {
+          child: record.ninos,
+          lastRecord: record,
+          isInFacility: isEntrada
+        })
+      } else {
+        const current = childrenStatus.get(ninoId)!
+        if (record.hora > current.lastRecord.hora) {
+          current.lastRecord = record
+          current.isInFacility = isEntrada
+        }
+      }
+    })
+
+    const ninosEnPlantel: ChildInFacility[] = []
+
+    childrenStatus.forEach((status, ninoId) => {
+      if (status.isInFacility) {
+        const entradaRecord = todayRecords
+          .filter(r => r.nino_id === ninoId && r.tipo === 'entrada')
+          .sort((a, b) => b.hora.localeCompare(a.hora))[0]
+
+        if (entradaRecord) {
+          const childData = {
+            id: status.child.id,
+            nombres: status.child.nombres,
+            apellidos: status.child.apellidos,
+            numero_documento: status.child.numero_documento,
+            hora_entrada: entradaRecord.hora,
+            acudiente_entrada: `${entradaRecord.acudientes.nombres} ${entradaRecord.acudientes.apellidos}`,
+            aula: status.child.aulas
+          }
+
+          ninosEnPlantel.push(childData)
+        }
+      }
+    })
+
+    setChildrenInFacility(ninosEnPlantel)
+  } catch (error) {
+    console.error('Dashboard - Error loading children in facility:', error)
+    setChildrenInFacility([])
   }
+}
+
 
   const getGreeting = () => {
     const hour = currentTime.getHours()

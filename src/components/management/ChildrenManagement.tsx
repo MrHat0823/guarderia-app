@@ -2,11 +2,16 @@ import React, { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Baby, School } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Nino, Aula } from '../../lib/types'
+import { useAuth } from '../../hooks/useAuth'
+
+
+
 
 export function ChildrenManagement() {
+  
   const [formError, setFormError] = useState('')
   const [formSuccess, setFormSuccess] = useState('')
-
+  const { user } = useAuth()
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [totalCount, setTotalCount] = useState(0)
@@ -27,16 +32,20 @@ export function ChildrenManagement() {
   })
 
   useEffect(() => {
-  loadChildren()
-}, [currentPage, searchTerm])
+  if (user?.guarderia_id) {
+    loadChildren()
+  }
+}, [user, currentPage, searchTerm])
+
 
 useEffect(() => {
   loadAulas()
 }, [])
 
-
   const loadChildren = async () => {
   try {
+    if (!user?.guarderia_id) return
+
     const from = (currentPage - 1) * itemsPerPage
     const to = from + itemsPerPage - 1
 
@@ -50,6 +59,7 @@ useEffect(() => {
           nivel_educativo
         )
       `, { count: 'exact' })
+      .eq('guarderia_id', user.guarderia_id) // 👈 FILTRO AÑADIDO
       .order('nombres')
       .range(from, to)
 
@@ -68,6 +78,7 @@ useEffect(() => {
     setLoading(false)
   }
 }
+
 
 
   const loadAulas = async () => {
@@ -97,6 +108,7 @@ useEffect(() => {
       tipo_documento: formData.tipo_documento,
       numero_documento: formData.numero_documento,
       aula_id: formData.aula_id || null,
+      guarderia_id: user?.guarderia_id, // ✅ Asignación automática
       activo: formData.activo
     }
 
@@ -365,7 +377,7 @@ useEffect(() => {
   />
 </div>
 
-        </div>
+        </div>     
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
@@ -466,5 +478,6 @@ useEffect(() => {
         </div>
       </div>
     </div>
+    
   )
 }

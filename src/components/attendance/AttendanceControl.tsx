@@ -20,6 +20,7 @@ import { useAuth } from '../../hooks/useAuth'
 import type { Acudiente, Nino, AttendanceType } from '../../lib/types'
 import { format } from 'date-fns'
 
+
 interface AttendanceControlProps {
   initialDocumento?: string
   onRegistrationComplete?: () => void
@@ -45,16 +46,13 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
 
   // Initialize document state and trigger search when initialDocumento changes
   useEffect(() => {
-    if (initialDocumento && initialDocumento !== documentoAcudiente) {
+    if (initialDocumento) {
       console.log('AttendanceControl - Documento inicial recibido:', initialDocumento)
       setDocumentoAcudiente(initialDocumento)
-      
-      // Ejecutar búsqueda automáticamente después de un pequeño delay
-      setTimeout(() => {
-        searchAcudiente(initialDocumento)
-      }, 100)
+      searchAcudiente(initialDocumento)
     }
-  }, [initialDocumento, documentoAcudiente])
+  }, [initialDocumento])
+
 
   // Filtrar niños cuando cambia la búsqueda
   useEffect(() => {
@@ -76,93 +74,105 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
   }, [childSearch, ninos])
 
   const searchAcudiente = async (documento: string) => {
-    if (!documento.trim()) return
+  if (!documento.trim()) return
 
-    console.log('AttendanceControl - Iniciando búsqueda para documento:', documento)
-    setLoading(true)
-    setMessage(null)
-    
-    try {
-      const { data: acudienteData, error: acudienteError } = await supabase
-        .from('acudientes')
-        .select('*')
-        .eq('numero_documento', documento)
-        .single()
+  console.log('AttendanceControl - Iniciando búsqueda para documento:', documento)
+  setLoading(true)
+  setMessage(null)
 
-      if (acudienteError) {
-        console.log('AttendanceControl - Acudiente no encontrado:', acudienteError)
-        setMessage({ type: 'error', text: 'Acudiente no encontrado' })
-        setAcudiente(null)
-        setNinos([])
-        setFilteredNinos([])
-        return
-      }
+  try {
 
-      console.log('AttendanceControl - Acudiente encontrado:', acudienteData)
-      setAcudiente(acudienteData)
+    const { data: acudienteData, error: acudienteError } = await supabase
+      .from('acudientes')
+      .select('*')
+      .eq('numero_documento', documento)
+      .eq('guarderia_id', user?.guarderia_id) // ← RESTRICCIÓN CLAVE
+      .maybeSingle()
 
-      // Get children associated with this guardian
-      const { data: ninosData, error: ninosError } = await supabase
-        .from('nino_acudiente')
-        .select(`
-          ninos (
-            id,
-            nombres,
-            apellidos,
-            tipo_documento,
-            numero_documento,
-            activo,
-            aulas (
-              nombre_aula,
-              nivel_educativo
-            )
-          )
-        `)
-        .eq('acudiente_id', acudienteData.id)
 
-      if (ninosError) {
-        console.log('AttendanceControl - Error al cargar niños:', ninosError)
-        setMessage({ type: 'error', text: 'Error al cargar los niños' })
-        return
-      }
-
-      const activeNinos = ninosData
-        .map(item => ({
-          ...item.ninos,
-          aula: item.ninos.aulas
-        }))
-        .filter(nino => nino.activo) as Nino[]
-
-      setNinos(activeNinos)
-      setFilteredNinos(activeNinos)
-      console.log('AttendanceControl - Niños encontrados:', activeNinos.length)
-
-      if (activeNinos.length === 0) {
-        setMessage({ type: 'error', text: 'No hay niños activos asociados a este acudiente' })
-      } else {
-        setMessage({ type: 'success', text: `Acudiente encontrado con ${activeNinos.length} niño(s) activo(s)` })
-        
-        // Si solo hay un niño, seleccionarlo automáticamente
-        if (activeNinos.length === 1) {
-          setSelectedNino(activeNinos[0].id)
-          setSelectedChildData(activeNinos[0])
-        }
-      }
-    } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'PGRST116') {
-        console.log('AttendanceControl - Acudiente no encontrado (PGRST116)')
-        setMessage({ type: 'error', text: 'Acudiente no encontrado' })
-      } else {
-        console.error('AttendanceControl - Error general en búsqueda:', error)
-        setMessage({ type: 'error', text: 'Error al buscar el acudiente' })
-      }
+    if (!acudienteData || acudienteError) {
+      console.warn('AttendanceControl - Acudiente no encontrado:', acudienteError)
+      setMessage({ type: 'error', text: 'Acudiente no encontrado' })
       setAcudiente(null)
       setNinos([])
       setFilteredNinos([])
-    } finally {
-      setLoading(false)
+      return
     }
+
+    setAcudiente(acudienteData)
+
+    const { data: ninosData, error: ninosError } = await supabase
+  .from('nino_acudiente')
+  .select(`
+    ninos (
+      id,
+      nombres,
+      apellidos,
+      tipo_documento,
+      numero_documento,
+      activo,
+      guarderia_id,
+      aulas (
+        nombre_aula,
+        nivel_educativo
+      )
+    )
+  `)
+  .eq('acudiente_id', acudienteData.id)
+  // Aquí no se puede usar directamente ninos.guarderia_id en todas las versiones de Supabase.
+
+
+
+    if (ninosError || !ninosData) {
+      console.error('AttendanceControl - Error al cargar niños:', ninosError)
+      setMessage({ type: 'error', text: 'Error al cargar los niños' })
+      setNinos([])
+      setFilteredNinos([])
+      return
+    }
+
+    if (!user) {
+      setMessage({ type: 'error', text: 'Usuario no autenticado' })
+      return
+    }
+
+    const activeNinos: Nino[] = ninosData
+      .flatMap(item => {
+        const nino = item.ninos
+        const aula = Array.isArray(nino.aulas) ? nino.aulas[0] : nino.aulas
+        return {
+          ...nino,
+          aula
+        }
+      })
+      .filter(nino => nino.activo && nino.guarderia_id === user.guarderia_id)
+
+    if (activeNinos.length === 0) {
+      setMessage({ type: 'error', text: 'No hay niños activos asociados a este acudiente' })
+    } else {
+      setMessage({ type: 'success', text: `Acudiente encontrado con ${activeNinos.length} niño(s) activo(s)` })
+    }
+
+    setNinos(activeNinos)
+    setFilteredNinos(activeNinos)
+
+    // Selección automática si hay solo uno
+    if (activeNinos.length === 1) {
+      setSelectedNino(activeNinos[0].id)
+      setSelectedChildData(activeNinos[0])
+    }
+
+  } catch (error) {
+    console.error('AttendanceControl - Error general en búsqueda:', error)
+    setMessage({ type: 'error', text: 'Error al buscar el acudiente' })
+    setAcudiente(null)
+    setNinos([])
+    setFilteredNinos([])
+  } finally {
+    setLoading(false)
   }
+}
+
 
   const selectChild = (nino: Nino) => {
     setSelectedNino(nino.id)

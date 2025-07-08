@@ -3,12 +3,17 @@ import { Plus, Edit2, Trash2, Users, Mail, Phone } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import type { User, UserRole } from '../../lib/types'
+import { useGuarderias } from '../../hooks/useGuarderias'
+
 
 export function UserManagement() {
+  const { user } = useAuth()
+  const { guarderias } = useGuarderias()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+
   const [formData, setFormData] = useState({
     nombres: '',
     apellidos: '',
@@ -16,34 +21,49 @@ export function UserManagement() {
     rol: 'profesor' as UserRole,
     tipo_documento: 'CC',
     numero_documento: '',
-    telefono: ''
+    telefono: '',
+    guarderia_id: '' // ✅ nuevo campo
   })
   const { createUser } = useAuth()
 
   useEffect(() => {
+  if (user) {
     loadUsers()
-  }, [])
+  }
+}, [user])
+
 
   const loadUsers = async () => {
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false })
+  try {
+    setLoading(true)
 
-      if (error) throw error
-      setUsers(data || [])
-    } catch (error) {
-      console.error('Error loading users:', error)
-    } finally {
-      setLoading(false)
+    let query = supabase.from('users').select('*').order('created_at', { ascending: false })
+
+    if (user?.rol === 'admin' && user.guarderia_id) {
+      query = query.eq('guarderia_id', user.guarderia_id).neq('rol', 'coordinador')
     }
+
+    const { data, error } = await query
+
+    if (error) throw error
+    setUsers(data || [])
+  } catch (error) {
+    console.error('Error loading users:', error)
+  } finally {
+    setLoading(false)
   }
+}
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    if (user?.rol === 'admin') {
+      formData.guarderia_id = user.guarderia_id ?? ''
+
+    }
+
 
     try {
       if (editingUser) {
@@ -71,14 +91,16 @@ export function UserManagement() {
       setShowCreateForm(false)
       setEditingUser(null)
       setFormData({
-        nombres: '',
-        apellidos: '',
-        password: '',
-        rol: 'profesor',
-        tipo_documento: 'CC',
-        numero_documento: '',
-        telefono: ''
-      })
+          nombres: '',
+          apellidos: '',
+          password: '',
+          rol: 'profesor',
+          tipo_documento: 'CC',
+          numero_documento: '',
+          telefono: '',
+          guarderia_id: ''
+        })
+
     } catch (error) {
       console.error('Error saving user:', error)
     } finally {
@@ -86,19 +108,21 @@ export function UserManagement() {
     }
   }
 
-  const handleEdit = (user: User) => {
-    setEditingUser(user)
-    setFormData({
-      nombres: user.nombres,
-      apellidos: user.apellidos,
-      password: user.password || '',
-      rol: user.rol,
-      tipo_documento: user.tipo_documento,
-      numero_documento: user.numero_documento,
-      telefono: user.telefono || ''
-    })
-    setShowCreateForm(true)
-  }
+ const handleEdit = (user: User) => {
+  setEditingUser(user)
+  setFormData({
+    nombres: user.nombres,
+    apellidos: user.apellidos,
+    password: '', // ← simplemente dejamos el campo vacío
+    rol: user.rol,
+    tipo_documento: user.tipo_documento,
+    numero_documento: user.numero_documento,
+    telefono: user.telefono || '',
+    guarderia_id: user.guarderia_id || ''
+  })
+  setShowCreateForm(true)
+}
+
 
   const handleDelete = async (userId: string) => {
     if (!confirm('¿Está seguro de que desea eliminar este usuario?')) return
@@ -165,6 +189,28 @@ export function UserManagement() {
                 {editingUser ? 'Editar Usuario' : 'Crear Usuario'}
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">
+
+
+     {user?.rol !== 'admin' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Guardería
+          </label>
+          <select
+            value={formData.guarderia_id}
+            onChange={(e) => setFormData({ ...formData, guarderia_id: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint-500 focus:border-mint-500"
+            required
+          >
+            <option value="">Seleccione guardería</option>
+            {guarderias.map((g) => (
+              <option key={g.id} value={g.id}>{g.nombre}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Nombres
@@ -270,7 +316,8 @@ export function UserManagement() {
                         rol: 'profesor',
                         tipo_documento: 'CC',
                         numero_documento: '',
-                        telefono: ''
+                        telefono: '',
+                        guarderia_id: ''  // ← 👈 necesario para que coincida con la estructura original
                       })
                     }}
                     className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-400 transition-colors"

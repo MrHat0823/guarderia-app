@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'profesor' | 'portero'
+export type UserRole = 'coordinador' | 'admin' | 'profesor' | 'portero'
 export type AttendanceType = 'entrada' | 'salida'
 export type TipoParentesco = 'Madre' | 'Padre' | 'Hermano' | 'Hermana' | 'Tío' | 'Tía' | 'Abuelo' | 'Abuela' | 'Tutor Legal' | 'Otro'
 
@@ -10,6 +10,7 @@ export interface User {
   tipo_documento: string
   numero_documento: string
   telefono?: string
+  guarderia_id: string | null      // ✅ <-- AÑADE ESTA LÍNEA
   created_at: string
   updated_at: string
 }
@@ -91,4 +92,12 @@ export interface DaycareConfig {
   direccion_guarderia?: string
   created_at: string
   updated_at: string
+}
+
+export interface Guarderia {
+  id: string
+  nombre: string
+  direccion: string | null
+  telefono: string | null
+  created_at: string | null
 }

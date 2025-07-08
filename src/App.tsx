@@ -12,6 +12,8 @@ import { ClassroomManagement } from './components/management/ClassroomManagement
 import { UserSettings } from './components/settings/UserSettings'
 import { useAuth } from './hooks/useAuth'
 import { AttendanceSummary } from './components/attendance/AttendanceSummary'
+import { GuarderiaManagement } from './components/management/GuarderiaManagement'
+
 
 
 function App() {
@@ -65,6 +67,13 @@ function App() {
         return <UserSettings />
         case 'attendance-summary':
         return <AttendanceSummary />
+        case 'guarderias':
+        return user?.rol === 'coordinador'
+          ? <GuarderiaManagement />
+          : <div className="p-6 text-red-600 font-bold">Acceso denegado</div>
+
+
+
 
       default:
         return <Dashboard onNavigate={setActiveTab} />
