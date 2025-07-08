@@ -1,7 +1,19 @@
 import React, { useState, useEffect } from 'react'
-import { QrCode, Search, AlertCircle, Camera, RefreshCw, ArrowLeft } from 'lucide-react'
+import {
+  QrCode,
+  AlertCircle,
+  Camera,
+  RefreshCw,
+  ArrowLeft,
+} from 'lucide-react'
 import { QRScanner } from './QRScanner'
 import { AttendanceControl } from './AttendanceControl'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
+
+
+// Sonido de éxito
+const successSound = new Audio('/sounds/scan-success.mp3')
 
 export function QRScannerPage() {
   const [showScanner, setShowScanner] = useState(false)
@@ -9,28 +21,105 @@ export function QRScannerPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [showAttendanceForm, setShowAttendanceForm] = useState(false)
 
+  const { user } = useAuth()
+
   const handleScan = async (data: string) => {
     console.log('QRScannerPage - Código escaneado:', data)
+    successSound.play().catch((err) =>
+      console.error('Error al reproducir sonido:', err)
+    )
+
     setIsProcessing(true)
     setScannedDocument(data)
-    
-    // Cerrar el modal del escáner automáticamente
     setShowScanner(false)
-    
-    // Mostrar el formulario de asistencia después de un breve delay
-    setTimeout(() => {
+
+    try {
+      // Buscar acudiente por documento
+      const { data: acudiente, error: acudienteError } = await supabase
+        .from('acudientes')
+        .select('id')
+        .eq('numero_documento', data)
+        .single()
+
+      if (acudienteError || !acudiente) {
+        console.error('Acudiente no encontrado:', acudienteError)
+        setIsProcessing(false)
+        return
+      }
+
+      const acudienteId = acudiente.id
+
+      // Buscar niños vinculados
+      const { data: vinculaciones, error: vinculacionError } = await supabase
+        .from('nino_acudiente')
+        .select('nino_id')
+        .eq('acudiente_id', acudienteId)
+
+      if (vinculacionError || !vinculaciones) {
+        console.error('Error obteniendo niños:', vinculacionError)
+        setIsProcessing(false)
+        return
+      }
+
+      if (vinculaciones.length === 1) {
+        const ninoId = vinculaciones[0].nino_id
+
+        // Verificar si ya hubo entrada hoy
+        const hoy = new Date().toISOString().split('T')[0]
+        const { data: registrosHoy, error: errorRegistros } = await supabase
+          .from('registros_asistencia')
+          .select('tipo')
+          .eq('nino_id', ninoId)
+          .eq('fecha', hoy)
+
+        if (errorRegistros) {
+          console.error('Error consultando registros del día:', errorRegistros)
+          setIsProcessing(false)
+          return
+        }
+
+        const yaRegistroEntrada = registrosHoy?.some(
+          (r) => r.tipo === 'entrada'
+        )
+
+        const tipoRegistro = yaRegistroEntrada ? 'salida' : 'entrada'
+
+        const { error: registroError } = await supabase
+          .from('registros_asistencia')
+          .insert({
+            nino_id: ninoId,
+            acudiente_id: acudienteId,
+            usuario_registra_id: user?.id,
+            tipo: tipoRegistro,
+            guarderia_id: user?.guarderia_id,
+          })
+
+        if (registroError) {
+          console.error('Error registrando asistencia automática:', registroError)
+        } else {
+          alert(`Registro automático realizado (${tipoRegistro})`)
+        }
+
+        setIsProcessing(false)
+        setShowAttendanceForm(false)
+        setScannedDocument('')
+      } else {
+        // Tiene más de un niño: abrir formulario manual
+        setTimeout(() => {
+          setIsProcessing(false)
+          setShowAttendanceForm(true)
+        }, 500)
+      }
+    } catch (error) {
+      console.error('Error general en handleScan:', error)
       setIsProcessing(false)
-      setShowAttendanceForm(true)
-    }, 1000)
+    }
   }
 
   const handleClearAndScanAgain = () => {
-    // Limpiar todos los datos
     setScannedDocument('')
     setShowAttendanceForm(false)
     setIsProcessing(false)
-    
-    // Abrir el escáner nuevamente
     setShowScanner(true)
   }
 
@@ -39,7 +128,6 @@ export function QRScannerPage() {
     setScannedDocument('')
   }
 
-  // Escuchar eventos del iframe del escáner
   useEffect(() => {
     const handleQRScanned = (event: CustomEvent) => {
       console.log('QRScannerPage - Evento QR escaneado:', event.detail)
@@ -47,7 +135,7 @@ export function QRScannerPage() {
     }
 
     window.addEventListener('qr-scanned', handleQRScanned as EventListener)
-    
+
     return () => {
       window.removeEventListener('qr-scanned', handleQRScanned as EventListener)
     }
@@ -56,9 +144,7 @@ export function QRScannerPage() {
   return (
     <div className="p-6">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Escáner QR
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Escáner QR</h1>
         <p className="text-gray-600">
           Escanee el código QR del acudiente para registro rápido
         </p>
@@ -71,9 +157,7 @@ export function QRScannerPage() {
             <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <QrCode className="w-8 h-8 text-purple-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Escáner QR
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Escáner QR</h3>
             <p className="text-sm text-gray-600 mb-4">
               Usar la cámara para escanear código QR
             </p>
@@ -106,19 +190,16 @@ export function QRScannerPage() {
         </div>
       </div>
 
-      {/* Modal del escáner QR */}
-      <QRScanner 
+      <QRScanner
         onScan={handleScan}
         isActive={showScanner}
         onClose={() => setShowScanner(false)}
         isProcessing={isProcessing}
       />
 
-      {/* Modal de Registro de Asistencia */}
       {showAttendanceForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[95vh] overflow-hidden">
-            {/* Header del modal */}
             <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-mint-50 to-mint-100">
               <div className="flex items-center justify-between">
                 <div>
@@ -127,7 +208,10 @@ export function QRScannerPage() {
                     Registro de Asistencia
                   </h2>
                   <p className="text-gray-600 mt-1">
-                    Código escaneado: <span className="font-mono font-bold text-mint-700">{scannedDocument}</span>
+                    Código escaneado:{' '}
+                    <span className="font-mono font-bold text-mint-700">
+                      {scannedDocument}
+                    </span>
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -147,13 +231,11 @@ export function QRScannerPage() {
                 </div>
               </div>
             </div>
-            
-            {/* Contenido del modal */}
+
             <div className="p-6 overflow-y-auto max-h-[calc(95vh-120px)]">
-              <AttendanceControl 
+              <AttendanceControl
                 initialDocumento={scannedDocument}
                 onRegistrationComplete={() => {
-                  // Cerrar modal después de registro exitoso
                   setTimeout(() => {
                     setShowAttendanceForm(false)
                     setScannedDocument('')

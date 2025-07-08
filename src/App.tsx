@@ -13,7 +13,8 @@ import { UserSettings } from './components/settings/UserSettings'
 import { useAuth } from './hooks/useAuth'
 import { AttendanceSummary } from './components/attendance/AttendanceSummary'
 import { GuarderiaManagement } from './components/management/GuarderiaManagement'
-
+import { CoordinatorStatistics } from './components/statistics/CoordinatorStatistics'
+import { CoordinatorDashboard } from './components/dashboard/CoordinatorDashboard'
 
 
 function App() {
@@ -44,41 +45,45 @@ function App() {
     return <LoginForm />
   }
 
-  // Render main app content
   const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard onNavigate={setActiveTab} />
-      case 'attendance':
-        return <AttendanceControl />
-      case 'qr-scanner':
-        return <QRScannerPage />
-      case 'statistics':
-        return <Statistics />
-      case 'users':
-        return <UserManagement />
-      case 'children':
-        return <ChildrenManagement />
-      case 'guardians':
-        return <GuardianManagement />
-      case 'classrooms':
-        return <ClassroomManagement />
-      case 'settings':
-        return <UserSettings />
-        case 'attendance-summary':
-        return <AttendanceSummary />
-        case 'guarderias':
-        return user?.rol === 'coordinador'
-          ? <GuarderiaManagement />
-          : <div className="p-6 text-red-600 font-bold">Acceso denegado</div>
-
-
-
-
-      default:
-        return <Dashboard onNavigate={setActiveTab} />
-    }
+  switch (activeTab) {
+    case 'dashboard':
+      return user?.rol === 'coordinador'
+        ? <CoordinatorDashboard onNavigate={setActiveTab} />
+        : <Dashboard onNavigate={setActiveTab} />
+    case 'attendance':
+      return <AttendanceControl />
+    case 'qr-scanner':
+      return <QRScannerPage />
+    case 'statistics':
+      return <Statistics />
+    case 'coordinator-statistics':
+      return user?.rol === 'coordinador'
+        ? <CoordinatorStatistics />
+        : <div className="p-6 text-red-600 font-bold">Acceso denegado</div>
+    case 'users':
+      return <UserManagement />
+    case 'children':
+      return <ChildrenManagement />
+    case 'guardians':
+      return <GuardianManagement />
+    case 'classrooms':
+      return <ClassroomManagement />
+    case 'settings':
+      return <UserSettings />
+    case 'attendance-summary':
+      return <AttendanceSummary />
+    case 'guarderias':
+      return user?.rol === 'coordinador'
+        ? <GuarderiaManagement />
+        : <div className="p-6 text-red-600 font-bold">Acceso denegado</div>
+    default:
+      return <Dashboard onNavigate={setActiveTab} />
   }
+}
+
+
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -88,6 +93,7 @@ function App() {
       </main>
     </div>
   )
+  
 }
 
 export default App

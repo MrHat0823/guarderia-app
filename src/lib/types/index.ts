@@ -10,7 +10,10 @@ export interface User {
   tipo_documento: string
   numero_documento: string
   telefono?: string
-  guarderia_id: string | null      // ✅ <-- AÑADE ESTA LÍNEA
+  guarderia_id: string | null
+  guarderia?: {
+    nombre: string
+  }
   created_at: string
   updated_at: string
 }
@@ -34,6 +37,7 @@ export interface Nino {
   numero_documento: string
   aula_id?: string
   activo: boolean
+  guarderia_id: string
   created_at: string
   aula?: Aula
 }

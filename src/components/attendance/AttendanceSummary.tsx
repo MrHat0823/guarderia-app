@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { formatInTimeZone } from 'date-fns-tz'
 
 
 export function AttendanceSummary() {
@@ -27,13 +28,26 @@ export function AttendanceSummary() {
 
 
   const fetchAbsentChildrenForDate = async (date: Date) => {
-    const fecha = date.toISOString().split('T')[0]
+
+    const fecha = formatInTimeZone(date, 'America/Bogota', 'yyyy-MM-dd')
 
     const { data: allChildren } = await supabase
-    .from('ninos')
-    .select('id, nombres, apellidos')
-    .eq('activo', true)
-    .eq('guarderia_id', user?.guarderia_id)
+      .from('ninos')
+      .select(`
+      id,
+      nombres,
+      apellidos,
+      guarderia_id,
+      aula_id,
+      aulas (
+        id,
+        nombre_aula
+      )
+    `)
+
+  .eq('activo', true)
+  .eq('guarderia_id', user?.guarderia_id)
+
 
 
     const { data: attendanceToday } = await supabase
@@ -98,13 +112,8 @@ export function AttendanceSummary() {
   max={maxDate} // ⬅️ evita fechas futuras
   onChange={(e) => {
     const parts = e.target.value.split('-')
-    const adjustedDate = new Date(
-      Number(parts[0]),
-      Number(parts[1]) - 1,
-      Number(parts[2]),
-      12, 0, 0
-    )
-    setSelectedDate(adjustedDate)
+    setSelectedDate(new Date(`${e.target.value}T00:00:00`))
+
   }}
   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint-500 focus:border-mint-500"
 />
@@ -239,23 +248,29 @@ export function AttendanceSummary() {
 
 
                   const { error: insertError } = await supabase.from('registros_asistencia').insert([
-                    {
-                      nino_id: selectedChild.id,
-                      fecha,
-                      tipo: 'entrada',
-                      hora: entrada,
-                      usuario_registra_id,
-                      acudiente_id: selectedAcudienteId,
-                    },
-                    {
-                      nino_id: selectedChild.id,
-                      fecha,
-                      tipo: 'salida',
-                      hora: salida,
-                      usuario_registra_id,
-                      acudiente_id: selectedAcudienteId,
-                    },
-                  ])
+                      {
+                        nino_id: selectedChild.id,
+                        fecha,
+                        tipo: 'entrada',
+                        hora: entrada,
+                        usuario_registra_id,
+                        acudiente_id: selectedAcudienteId,
+                        guarderia_id: user?.guarderia_id,
+                        aula_id: selectedChild.aula_id || selectedChild.aulas?.id || null, // ✅ añadido
+                      },
+                      {
+                        nino_id: selectedChild.id,
+                        fecha,
+                        tipo: 'salida',
+                        hora: salida,
+                        usuario_registra_id,
+                        acudiente_id: selectedAcudienteId,
+                        guarderia_id: user?.guarderia_id,
+                        aula_id: selectedChild.aula_id || selectedChild.aulas?.id || null, // ✅ añadido
+                      },
+                    ])
+
+
 
                   if (insertError) {
                     alert('Error al registrar asistencia: ' + insertError.message)

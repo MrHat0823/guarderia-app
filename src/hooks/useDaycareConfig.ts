@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { DaycareConfig } from '../lib/types'
+import { useAuth } from './useAuth'
 
 export function useDaycareConfig() {
+  const { user } = useAuth()
   const [config, setConfig] = useState<DaycareConfig | null>(null)
   const [loading, setLoading] = useState(true)
+
+   const daycareNombre =
+    user?.rol === 'coordinador'
+      ? 'SISTEMA DE GESTIÓN DE GUARDERÍAS'
+      : user?.guarderia?.nombre || config?.nombre_guarderia || 'Guardería Infantil'
 
   useEffect(() => {
     loadConfig()
@@ -232,6 +239,6 @@ export function useDaycareConfig() {
     config,
     loading,
     updateConfig,
-    daycareNombre: config?.nombre_guarderia || 'Guardería Infantil'
+    daycareNombre
   }
 }

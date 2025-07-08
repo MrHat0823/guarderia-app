@@ -52,8 +52,10 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 const getMenuItems = () => {
   const commonItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
+    { id: 'qr-scanner', label: 'Escáner QR', icon: QrCode },
     { id: 'attendance-summary', label: 'Registro Personalizado', icon: CalendarSearch },
-    { id: 'statistics', label: 'Estadísticas', icon: BarChart3 }
+    { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
+    { id: 'settings', label: 'Configuración', icon: Settings }
   ]
 
   const adminItems = [
@@ -71,8 +73,8 @@ const getMenuItems = () => {
   return [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'attendance-summary', label: 'Registro Personalizado', icon: CalendarSearch },
-    { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
-    { id: 'guarderias', label: 'Gestión de Guarderías', icon: School }
+    { id: 'guarderias', label: 'Gestión de Guarderías', icon: School },
+    { id: 'coordinator-statistics', label: 'Estadísticas Coordinador', icon: BarChart3 },
   ]
 }
 
@@ -101,8 +103,9 @@ const menuItems = getMenuItems()
               {daycareNombre}
             </h2>
             <p className="text-sm text-gray-500">
-              Sistema de gestión
-            </p>
+            {user?.rol === 'coordinador' ? '' : 'Sistema de gestión'}
+          </p>
+
           </div>
         </div>
       </div>

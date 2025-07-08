@@ -40,7 +40,8 @@ export function ChildrenManagement() {
 
 useEffect(() => {
   loadAulas()
-}, [])
+}, [user?.guarderia_id])
+
 
   const loadChildren = async () => {
   try {
@@ -82,18 +83,22 @@ useEffect(() => {
 
 
   const loadAulas = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('aulas')
-        .select('*')
-        .order('nombre_aula')
+  try {
+    if (!user?.guarderia_id) return  // Evitar cargar si no hay guardería asociada
 
-      if (error) throw error
-      setAulas(data || [])
-    } catch (error) {
-      console.error('Error loading aulas:', error)
-    }
+    const { data, error } = await supabase
+      .from('aulas')
+      .select('*')
+      .eq('guarderia_id', user.guarderia_id) // ✅ Filtro por guardería
+      .order('nombre_aula')
+
+    if (error) throw error
+    setAulas(data || [])
+  } catch (error) {
+    console.error('Error loading aulas:', error)
   }
+}
+
 
  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault()

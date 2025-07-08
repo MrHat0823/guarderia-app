@@ -22,10 +22,12 @@ export function useAuth() {
         // Verificar que el usuario aún existe en la base de datos
         try {
           const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', parsedUser.id)
-            .single()
+          .from('users')
+          .select('*, guarderia:guarderias (nombre)')
+          .eq('id', parsedUser.id)
+          .single()
+
+
 
           if (error || !data) {
             console.log('useAuth - Usuario no encontrado en BD, limpiando localStorage')
@@ -69,9 +71,10 @@ export function useAuth() {
     // Buscar el usuario solo por número de documento
     const { data, error } = await supabase
       .from('users')
-      .select('*')
+      .select('*, guarderia:guarderias(id, nombre)')
       .eq('numero_documento', documento.trim())
       .single()
+
 
     if (error || !data) {
       console.error('useAuth - Documento no encontrado:', error)

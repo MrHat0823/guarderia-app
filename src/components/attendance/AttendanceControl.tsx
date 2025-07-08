@@ -39,6 +39,9 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
   
   // Estados para búsqueda y filtros de niños
   const [childSearch, setChildSearch] = useState('')
+  const [hasEntradaToday, setHasEntradaToday] = useState(false)
+  const [canRegisterSalida, setCanRegisterSalida] = useState(false)
+
   const [showChildrenModal, setShowChildrenModal] = useState(false)
   const [selectedChildData, setSelectedChildData] = useState<Nino | null>(null)
   
@@ -102,22 +105,25 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
     setAcudiente(acudienteData)
 
     const { data: ninosData, error: ninosError } = await supabase
-  .from('nino_acudiente')
-  .select(`
-    ninos (
-      id,
-      nombres,
-      apellidos,
-      tipo_documento,
-      numero_documento,
-      activo,
-      guarderia_id,
-      aulas (
-        nombre_aula,
-        nivel_educativo
-      )
-    )
-  `)
+        .from('nino_acudiente')
+        .select(`
+          ninos (
+            id,
+            nombres,
+            apellidos,
+            tipo_documento,
+            numero_documento,
+            activo,
+            guarderia_id,
+            aula_id,
+            aulas (
+              id,
+              nombre_aula,
+              nivel_educativo
+            )
+          )
+        `)
+
   .eq('acudiente_id', acudienteData.id)
   // Aquí no se puede usar directamente ninos.guarderia_id en todas las versiones de Supabase.
 
@@ -156,11 +162,13 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
     setNinos(activeNinos)
     setFilteredNinos(activeNinos)
 
-    // Selección automática si hay solo uno
     if (activeNinos.length === 1) {
-      setSelectedNino(activeNinos[0].id)
-      setSelectedChildData(activeNinos[0])
+      const onlyChild = activeNinos[0]
+      setSelectedNino(onlyChild.id)
+      setSelectedChildData(onlyChild)
+      checkIfEntradaExistsToday(onlyChild.id) // ✅ NUEVA LÍNEA CRUCIAL
     }
+
 
   } catch (error) {
     console.error('AttendanceControl - Error general en búsqueda:', error)
@@ -173,10 +181,35 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
   }
 }
 
+    const checkIfEntradaExistsToday = async (ninoId: string) => {
+    const today = new Date().toISOString().split('T')[0]
+
+          const { data, error } = await supabase
+            .from('registros_asistencia')
+            .select('id')
+            .eq('nino_id', ninoId)
+            .eq('tipo', 'entrada')
+            .eq('fecha', today)
+            .limit(1)
+
+          if (error) {
+            console.error('Error al verificar entrada de hoy:', error)
+            setHasEntradaToday(false)
+            setCanRegisterSalida(false)
+            return
+          }
+
+          const hasEntrada = data.length > 0
+          setHasEntradaToday(hasEntrada)
+          setCanRegisterSalida(hasEntrada)
+      }
+
+
 
   const selectChild = (nino: Nino) => {
     setSelectedNino(nino.id)
     setSelectedChildData(nino)
+    checkIfEntradaExistsToday(nino.id)
     setShowChildrenModal(false)
     setChildSearch('')
   }
@@ -187,31 +220,50 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
   }
 
   const registerAttendance = async () => {
-    if (!acudiente || !selectedNino || !user?.id) {
-      setMessage({ type: 'error', text: 'Faltan datos requeridos' })
+  if (!acudiente || !selectedNino || !user?.id) {
+    setMessage({ type: 'error', text: 'Faltan datos requeridos' })
+    return
+  }
+
+  if (tipo === 'entrada' && hasEntradaToday) {
+    setMessage({ type: 'error', text: 'Ya se registró la entrada hoy para este niño' })
+    return
+  }
+
+  if (tipo === 'salida' && !canRegisterSalida) {
+    setMessage({ type: 'error', text: 'Debe registrar una entrada antes de registrar la salida' })
+    return
+  }
+
+  setLoading(true)
+  try {
+    const { error } = await supabase
+      .from('registros_asistencia')
+      .insert({
+        tipo,
+        nino_id: selectedNino,
+        acudiente_id: acudiente.id,
+        usuario_registra_id: user.id,
+        anotacion: anotacion.trim() || null,
+        guarderia_id: selectedChildData?.guarderia_id || user.guarderia_id || null,
+        aula_id: selectedChildData?.aula?.id || null 
+      })
+
+    if (error) {
+      setMessage({ type: 'error', text: 'Error al registrar la asistencia' })
       return
     }
 
-    setLoading(true)
-    try {
-      const { error } = await supabase
-        .from('registros_asistencia')
-        .insert({
-          tipo,
-          nino_id: selectedNino,
-          acudiente_id: acudiente.id,
-          usuario_registra_id: user.id,
-          anotacion: anotacion.trim() || null
-        })
+    setMessage({ type: 'success', text: 'Asistencia registrada exitosamente' })
 
-      if (error) {
-        setMessage({ type: 'error', text: 'Error al registrar la asistencia' })
-        return
-      }
+    // Actualizar estados según tipo
+    if (tipo === 'entrada') {
+      await checkIfEntradaExistsToday(selectedNino)
+    } else if (tipo === 'salida') {
+      setHasEntradaToday(false)
+      setCanRegisterSalida(false)
 
-      setMessage({ type: 'success', text: 'Asistencia registrada exitosamente' })
-      
-      // Limpiar todo inmediatamente
+      // Limpiar todo
       setSelectedChildData(null)
       setSelectedNino('')
       setChildSearch('')
@@ -222,18 +274,22 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
       setAcudiente(null)
       setNinos([])
       setFilteredNinos([])
-      
-      // Notificar al componente padre si existe
-      if (onRegistrationComplete) {
-        onRegistrationComplete()
-      }
-      
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Error al registrar la asistencia' })
-    } finally {
-      setLoading(false)
     }
+
+    // Notificar al componente padre si existe
+    if (onRegistrationComplete) {
+      onRegistrationComplete()
+    }
+
+  } catch (error) {
+    setMessage({ type: 'error', text: 'Error al registrar la asistencia' })
+  } finally {
+    setLoading(false)
   }
+}
+
+
+
 
   const handleDocumentSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -432,14 +488,17 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  type="button"
-                  onClick={() => setTipo('entrada')}
-                  className={`relative p-6 rounded-xl border-2 transition-all duration-200 ${
-                    tipo === 'entrada'
-                      ? 'border-green-500 bg-green-50 shadow-lg scale-105'
-                      : 'border-gray-300 bg-white hover:border-green-300 hover:bg-green-50'
-                  }`}
+                    type="button"
+                    onClick={() => setTipo('entrada')}
+                    disabled={hasEntradaToday} // ✅ NUEVA LÍNEA
+                    className={`relative p-6 rounded-xl border-2 transition-all duration-200 ${
+                      tipo === 'entrada'
+                        ? 'border-green-500 bg-green-50 shadow-lg scale-105'
+                        : 'border-gray-300 bg-white hover:border-green-300 hover:bg-green-50'
+                    } ${hasEntradaToday ? 'opacity-50 cursor-not-allowed' : ''}`} // ✅ NUEVO ESTILO
                 >
+
+
                   <div className="flex flex-col items-center gap-2">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
                       tipo === 'entrada' ? 'bg-green-500' : 'bg-gray-400'
@@ -462,11 +521,12 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
                 <button
                   type="button"
                   onClick={() => setTipo('salida')}
+                  disabled={!canRegisterSalida}
                   className={`relative p-6 rounded-xl border-2 transition-all duration-200 ${
                     tipo === 'salida'
                       ? 'border-red-500 bg-red-50 shadow-lg scale-105'
                       : 'border-gray-300 bg-white hover:border-red-300 hover:bg-red-50'
-                  }`}
+                  } ${!canRegisterSalida ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <div className="flex flex-col items-center gap-2">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
@@ -479,6 +539,9 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
                     }`}>
                       Salida
                     </span>
+                    {!canRegisterSalida && (
+                      <p className="text-xs text-red-500 mt-1">Requiere entrada previa</p>
+                    )}
                   </div>
                   {tipo === 'salida' && (
                     <div className="absolute top-2 right-2">
@@ -486,6 +549,7 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
                     </div>
                   )}
                 </button>
+
               </div>
             </div>
 

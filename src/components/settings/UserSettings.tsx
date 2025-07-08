@@ -18,11 +18,10 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import type { User as UserType } from '../../lib/types'
-import { DaycareSettings } from './DaycareSettings'
 
 export function UserSettings() {
   const { user, signOut } = useAuth()
-  const [activeTab, setActiveTab] = useState<'personal' | 'daycare'>('personal')
+  const [activeTab, setActiveTab] = useState<'personal'>('personal')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
@@ -236,40 +235,10 @@ export function UserSettings() {
           Configuración
         </h1>
         <p className="text-gray-600">
-          {user?.rol === 'admin' 
-            ? 'Gestiona la configuración del sistema y tu información personal'
-            : 'Actualiza tu información personal y cambia tu contraseña'
-          }
+          Actualiza tu información personal y cambia tu contraseña
         </p>
-      </div>
 
-      {/* Navigation Tabs - Solo mostrar si es admin */}
-      {user?.rol === 'admin' && (
-        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-8 max-w-md">
-          <button
-            onClick={() => setActiveTab('personal')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'personal'
-                ? 'bg-white text-mint-700 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <User className="w-4 h-4" />
-            Personal
-          </button>
-          <button
-            onClick={() => setActiveTab('daycare')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'daycare'
-                ? 'bg-white text-mint-700 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Settings className="w-4 h-4" />
-            Guardería
-          </button>
-        </div>
-      )}
+      </div>
 
       {message && (
         <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
@@ -291,9 +260,7 @@ export function UserSettings() {
       )}
 
       {/* Mostrar contenido según la pestaña activa */}
-      {activeTab === 'daycare' && user?.rol === 'admin' ? (
-        <DaycareSettings />
-      ) : (
+     
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Personal Information Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
@@ -555,7 +522,7 @@ export function UserSettings() {
           </form>
         </div>
       </div>
-      )}
+      
     </div>
   )
 }

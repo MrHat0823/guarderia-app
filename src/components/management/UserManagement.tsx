@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import type { User, UserRole } from '../../lib/types'
 import { useGuarderias } from '../../hooks/useGuarderias'
+import bcrypt from 'bcryptjs'
+
 
 
 export function UserManagement() {
