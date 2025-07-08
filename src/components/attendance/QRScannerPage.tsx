@@ -23,98 +23,130 @@ export function QRScannerPage() {
 
   const { user } = useAuth()
 
-  const handleScan = async (data: string) => {
-    console.log('QRScannerPage - Código escaneado:', data)
+  const handleScan = async (rawData: string) => {
+  const documento = rawData.trim().replace(/\s+/g, '')
+  setIsProcessing(true)
+  setScannedDocument(documento)
+  setShowScanner(false)
+
+  try {
+    // Buscar acudiente
+    const { data: acudiente, error: acudienteError } = await supabase
+      .from('acudientes')
+      .select('id, nombres, apellidos')
+      .eq('numero_documento', documento)
+      .single()
+
+    if (acudienteError || !acudiente) {
+      console.error('Acudiente no encontrado:', acudienteError)
+      alert('Acudiente no encontrado.')
+      setIsProcessing(false)
+      return
+    }
+
     successSound.play().catch((err) =>
       console.error('Error al reproducir sonido:', err)
     )
 
-    setIsProcessing(true)
-    setScannedDocument(data)
-    setShowScanner(false)
+    const acudienteId = acudiente.id
 
-    try {
-      // Buscar acudiente por documento
-      const { data: acudiente, error: acudienteError } = await supabase
-        .from('acudientes')
-        .select('id')
-        .eq('numero_documento', data)
+    // Obtener niño vinculado
+    const { data: vinculaciones, error: vinculacionError } = await supabase
+      .from('nino_acudiente')
+      .select('nino_id')
+      .eq('acudiente_id', acudienteId)
+
+    if (vinculacionError || !vinculaciones) {
+      console.error('Error obteniendo niños:', vinculacionError)
+      setIsProcessing(false)
+      return
+    }
+
+    // Si hay un solo niño, registrar directamente
+    if (vinculaciones.length === 1) {
+      const ninoId = vinculaciones[0].nino_id
+
+      // Obtener aula
+      const { data: ninoInfo, error: ninoError } = await supabase
+        .from('ninos')
+        .select('aula_id, nombres, apellidos')
+        .eq('id', ninoId)
         .single()
 
-      if (acudienteError || !acudiente) {
-        console.error('Acudiente no encontrado:', acudienteError)
+      if (ninoError || !ninoInfo?.aula_id) {
+        console.error('Error obteniendo aula del niño:', ninoError)
+        alert('No se pudo obtener el aula del niño.')
         setIsProcessing(false)
         return
       }
 
-      const acudienteId = acudiente.id
+      // Consultar registros de hoy
+      const hoy = new Date().toISOString().split('T')[0]
+      const { data: registrosHoy, error: errorRegistros } = await supabase
+        .from('registros_asistencia')
+        .select('tipo')
+        .eq('nino_id', ninoId)
+        .eq('fecha', hoy)
 
-      // Buscar niños vinculados
-      const { data: vinculaciones, error: vinculacionError } = await supabase
-        .from('nino_acudiente')
-        .select('nino_id')
-        .eq('acudiente_id', acudienteId)
-
-      if (vinculacionError || !vinculaciones) {
-        console.error('Error obteniendo niños:', vinculacionError)
+      if (errorRegistros) {
+        console.error('Error consultando registros del día:', errorRegistros)
         setIsProcessing(false)
         return
       }
 
-      if (vinculaciones.length === 1) {
-        const ninoId = vinculaciones[0].nino_id
+      const yaRegistroEntrada = registrosHoy?.some(r => r.tipo === 'entrada')
+      const yaRegistroSalida = registrosHoy?.some(r => r.tipo === 'salida')
 
-        // Verificar si ya hubo entrada hoy
-        const hoy = new Date().toISOString().split('T')[0]
-        const { data: registrosHoy, error: errorRegistros } = await supabase
-          .from('registros_asistencia')
-          .select('tipo')
-          .eq('nino_id', ninoId)
-          .eq('fecha', hoy)
+      let tipoRegistro: 'entrada' | 'salida' | null = null
 
-        if (errorRegistros) {
-          console.error('Error consultando registros del día:', errorRegistros)
-          setIsProcessing(false)
-          return
-        }
-
-        const yaRegistroEntrada = registrosHoy?.some(
-          (r) => r.tipo === 'entrada'
-        )
-
-        const tipoRegistro = yaRegistroEntrada ? 'salida' : 'entrada'
-
-        const { error: registroError } = await supabase
-          .from('registros_asistencia')
-          .insert({
-            nino_id: ninoId,
-            acudiente_id: acudienteId,
-            usuario_registra_id: user?.id,
-            tipo: tipoRegistro,
-            guarderia_id: user?.guarderia_id,
-          })
-
-        if (registroError) {
-          console.error('Error registrando asistencia automática:', registroError)
-        } else {
-          alert(`Registro automático realizado (${tipoRegistro})`)
-        }
-
-        setIsProcessing(false)
-        setShowAttendanceForm(false)
-        setScannedDocument('')
+      if (!yaRegistroEntrada) {
+        tipoRegistro = 'entrada'
+      } else if (!yaRegistroSalida) {
+        tipoRegistro = 'salida'
       } else {
-        // Tiene más de un niño: abrir formulario manual
-        setTimeout(() => {
-          setIsProcessing(false)
-          setShowAttendanceForm(true)
-        }, 500)
+        alert(`El niño ${ninoInfo.nombres} ${ninoInfo.apellidos} ya registró Entrada y Salida el día de hoy.`)
+        setIsProcessing(false)
+        return
       }
-    } catch (error) {
-      console.error('Error general en handleScan:', error)
+
+      // Insertar registro
+      const { error: registroError } = await supabase
+        .from('registros_asistencia')
+        .insert({
+          nino_id: ninoId,
+          acudiente_id: acudienteId,
+          usuario_registra_id: user?.id,
+          tipo: tipoRegistro,
+          guarderia_id: user?.guarderia_id,
+          aula_id: ninoInfo.aula_id,
+        })
+
+      if (registroError) {
+        console.error('Error registrando asistencia automática:', registroError)
+        alert('Error al registrar asistencia automática.')
+      } else {
+        alert(`Registro automático realizado (${tipoRegistro})`)
+      }
+
       setIsProcessing(false)
+      setShowAttendanceForm(false)
+      setScannedDocument('')
+    } else {
+      // Más de un niño → abrir formulario manual
+      setTimeout(() => {
+        setIsProcessing(false)
+        setShowAttendanceForm(true)
+      }, 500)
     }
+
+  } catch (error) {
+    console.error('Error general en handleScan:', error)
+    alert('Error inesperado al escanear.')
+    setIsProcessing(false)
   }
+}
+
+
 
   const handleClearAndScanAgain = () => {
     setScannedDocument('')
