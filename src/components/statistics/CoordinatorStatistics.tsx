@@ -1,3 +1,4 @@
+// project\src\components\statistics\CoordinatorStatistics.tsx
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
@@ -20,6 +21,9 @@ export function CoordinatorStatistics() {
   const [selectedChild, setSelectedChild] = useState<any | null>(null)
   const [childDetails, setChildDetails] = useState<any | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 5
+
 
   useEffect(() => {
     if (user?.rol === 'coordinador') {
@@ -27,6 +31,11 @@ export function CoordinatorStatistics() {
       fetchNinos()
     }
   }, [user])
+
+      useEffect(() => {
+      setCurrentPage(1)
+    }, [searchQuery])
+
 
   const fetchStats = async () => {
   const today = new Date()
@@ -176,11 +185,19 @@ export function CoordinatorStatistics() {
 }
 
 
-  const filteredNinos = ninos.filter((nino) => {
-    const fullName = `${nino.nombres} ${nino.apellidos}`.toLowerCase()
-    const query = searchQuery.toLowerCase()
-    return fullName.includes(query) || nino.numero_documento?.toString().includes(query)
-  })
+        const filteredAllNinos = ninos.filter((nino) => {
+          const fullName = `${nino.nombres} ${nino.apellidos}`.toLowerCase()
+          const query = searchQuery.toLowerCase()
+          return fullName.includes(query) || nino.numero_documento?.toString().includes(query)
+        })
+
+          const totalPages = Math.ceil(filteredAllNinos.length / itemsPerPage)
+          const paginatedNinos = filteredAllNinos.slice(
+            (currentPage - 1) * itemsPerPage,
+            currentPage * itemsPerPage
+          )
+
+
 
   return (
     <div className="p-6 space-y-8">
@@ -215,10 +232,12 @@ export function CoordinatorStatistics() {
 
         {/* Lista de niños */}
         <div className="mt-6 space-y-2">
-          {filteredNinos.length === 0 ? (
+          {filteredAllNinos.length === 0 ? (
+
             <p className="text-sm text-gray-500">No se encontraron resultados.</p>
           ) : (
-            filteredNinos.map((nino) => (
+            paginatedNinos.map((nino) => (
+
               <div
                 key={nino.id}
                 onClick={() => handleSelectChild(nino)}
@@ -230,6 +249,28 @@ export function CoordinatorStatistics() {
             ))
           )}
         </div>
+        {totalPages > 1 && (
+            <div className="mt-4 flex justify-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded border text-sm bg-white hover:bg-gray-100 disabled:opacity-40"
+              >
+                Anterior
+              </button>
+              <span className="px-2 py-1 text-sm text-gray-600">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded border text-sm bg-white hover:bg-gray-100 disabled:opacity-40"
+              >
+                Siguiente
+              </button>
+            </div>
+          )}
+
       </div>
 
       {/* Modal */}
@@ -312,8 +353,8 @@ export function CoordinatorStatistics() {
       )}
     </div>
   </div>
+  
 )}
-
     </div>
   )
 }

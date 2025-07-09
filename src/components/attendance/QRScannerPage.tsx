@@ -14,10 +14,8 @@ import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import { format, toZonedTime } from 'date-fns-tz'
 
-
 const successSound = new Audio('/sounds/scan-success.mp3')
 
-// ✅ Fecha actual en zona horaria Colombia
 const getFechaHoyColombia = () => {
   const zona = 'America/Bogota'
   const ahora = new Date()
@@ -208,7 +206,7 @@ export function QRScannerPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
       <h1 className="text-2xl font-bold mb-4 flex items-center gap-2 text-gray-800">
         <QrCode className="w-6 h-6 text-purple-600" />
         Escáner QR
@@ -216,7 +214,7 @@ export function QRScannerPage() {
 
       <button
         onClick={() => setShowScanner(true)}
-        className="bg-purple-600 hover:bg-purple-700 transition-colors duration-200 text-white px-4 py-2 rounded-md flex items-center gap-2 mb-6 shadow-sm"
+        className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 transition-colors duration-200 text-white px-4 py-2 rounded-md flex items-center justify-center gap-2 mb-6 shadow-sm"
       >
         <Camera className="w-5 h-5" /> Activar escáner
       </button>
@@ -229,13 +227,13 @@ export function QRScannerPage() {
       />
 
       {multipleChildren.length > 0 && acudienteData && (
-        <div className="bg-white rounded-lg shadow p-6 mt-4">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mt-4">
           <h2 className="text-lg font-semibold mb-2 text-center text-gray-800">
             Seleccione el niño para registrar asistencia
           </h2>
 
           <div className="mb-6 text-center">
-            <div className="inline-block bg-purple-50 border border-purple-200 rounded-lg px-6 py-4 shadow-sm">
+            <div className="max-w-full sm:max-w-md mx-auto bg-purple-50 border border-purple-200 rounded-lg px-4 py-4 sm:px-6 shadow-sm">
               <p className="text-xl font-bold text-gray-900 flex items-center justify-center gap-2 mb-1">
                 <User className="w-5 h-5 text-purple-600" />
                 {acudienteData.nombres} {acudienteData.apellidos}
@@ -254,22 +252,19 @@ export function QRScannerPage() {
             {multipleChildren.map((nino) => (
               <li
                 key={nino.id}
-                className="border border-gray-200 p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 bg-white flex items-center justify-between"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-gray-200 p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 bg-white"
               >
                 <div>
                   <p className="font-semibold text-gray-800 text-base">
                     🧒 {nino.nombres} {nino.apellidos}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Aula:{' '}
-                    <span className="font-medium">
-                      {nino.nombreAula || 'N/A'}
-                    </span>
+                    Aula: <span className="font-medium">{nino.nombreAula || 'N/A'}</span>
                   </p>
                 </div>
                 <button
                   onClick={() => registrarManual(nino)}
-                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2"
+                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm flex items-center justify-center gap-2"
                   disabled={isProcessing}
                 >
                   <LogIn className="w-4 h-4" />

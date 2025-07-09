@@ -1,110 +1,97 @@
+// project/src/components/attendance/AttendanceControl.tsx
 import React, { useState, useEffect } from 'react'
-import { 
-  Search, 
-  QrCode, 
-  UserCheck, 
-  Clock, 
-  Baby, 
+import {
+  Search,
+  QrCode,
+  UserCheck,
+  Clock,
+  Baby,
   Users,
   CheckCircle,
   XCircle,
-  AlertCircle,
-  TrendingUp,
-  Filter,
-  X,
   ArrowRight,
-  Zap
+  Zap,
+  TrendingUp,
+  X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import type { Acudiente, Nino, AttendanceType } from '../../lib/types'
-import { format } from 'date-fns'
-
+import { format, toZonedTime } from 'date-fns-tz'
+import toast from 'react-hot-toast'
 
 interface AttendanceControlProps {
   initialDocumento?: string
   onRegistrationComplete?: () => void
 }
 
+const getFechaHoyColombia = () => {
+  const zona = 'America/Bogota'
+  const ahora = new Date()
+  return format(toZonedTime(ahora, zona), 'yyyy-MM-dd')
+}
+
 export function AttendanceControl({ initialDocumento = '', onRegistrationComplete }: AttendanceControlProps) {
-  const [documentoAcudiente, setDocumentoAcudiente] = useState('')
+  const { user } = useAuth()
+
+  const [documentoAcudiente, setDocumentoAcudiente] = useState(initialDocumento)
   const [acudiente, setAcudiente] = useState<Acudiente | null>(null)
   const [ninos, setNinos] = useState<Nino[]>([])
   const [filteredNinos, setFilteredNinos] = useState<Nino[]>([])
   const [selectedNino, setSelectedNino] = useState<string>('')
+  const [selectedChildData, setSelectedChildData] = useState<Nino | null>(null)
   const [tipo, setTipo] = useState<AttendanceType>('entrada')
   const [anotacion, setAnotacion] = useState('')
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-  
-  // Estados para búsqueda y filtros de niños
-  const [childSearch, setChildSearch] = useState('')
   const [hasEntradaToday, setHasEntradaToday] = useState(false)
+  const [hasSalidaToday, setHasSalidaToday] = useState(false)
   const [canRegisterSalida, setCanRegisterSalida] = useState(false)
-
   const [showChildrenModal, setShowChildrenModal] = useState(false)
-  const [selectedChildData, setSelectedChildData] = useState<Nino | null>(null)
-  
-  const { user } = useAuth()
+  const [childSearch, setChildSearch] = useState('')
 
-  // Initialize document state and trigger search when initialDocumento changes
   useEffect(() => {
     if (initialDocumento) {
-      console.log('AttendanceControl - Documento inicial recibido:', initialDocumento)
-      setDocumentoAcudiente(initialDocumento)
       searchAcudiente(initialDocumento)
     }
   }, [initialDocumento])
 
-
-  // Filtrar niños cuando cambia la búsqueda
   useEffect(() => {
-    if (!childSearch.trim()) {
-      setFilteredNinos(ninos)
-    } else {
+    if (childSearch.trim()) {
       const searchLower = childSearch.toLowerCase()
-      const filtered = ninos.filter(nino => {
+      const filtered = ninos.filter((nino) => {
         const fullName = `${nino.nombres} ${nino.apellidos}`.toLowerCase()
-        const documento = nino.numero_documento.toLowerCase()
+        const documento = nino.numero_documento?.toLowerCase() || ''
         const aula = nino.aula?.nombre_aula?.toLowerCase() || ''
-        
-        return fullName.includes(searchLower) || 
-               documento.includes(searchLower) || 
-               aula.includes(searchLower)
+        return fullName.includes(searchLower) || documento.includes(searchLower) || aula.includes(searchLower)
       })
       setFilteredNinos(filtered)
+    } else {
+      setFilteredNinos(ninos)
     }
   }, [childSearch, ninos])
 
   const searchAcudiente = async (documento: string) => {
-  if (!documento.trim()) return
+    if (!documento.trim() || !user) return
+    setLoading(true)
 
-  console.log('AttendanceControl - Iniciando búsqueda para documento:', documento)
-  setLoading(true)
-  setMessage(null)
+    try {
+      const { data: acudienteData, error: acudienteError } = await supabase
+        .from('acudientes')
+        .select('*')
+        .eq('numero_documento', documento)
+        .eq('guarderia_id', user.guarderia_id)
+        .maybeSingle()
 
-  try {
+      if (!acudienteData || acudienteError) {
+        toast.error('Acudiente no encontrado')
+        setAcudiente(null)
+        setNinos([])
+        return
+      }
 
-    const { data: acudienteData, error: acudienteError } = await supabase
-      .from('acudientes')
-      .select('*')
-      .eq('numero_documento', documento)
-      .eq('guarderia_id', user?.guarderia_id) // ← RESTRICCIÓN CLAVE
-      .maybeSingle()
+      setAcudiente(acudienteData)
 
-
-    if (!acudienteData || acudienteError) {
-      console.warn('AttendanceControl - Acudiente no encontrado:', acudienteError)
-      setMessage({ type: 'error', text: 'Acudiente no encontrado' })
-      setAcudiente(null)
-      setNinos([])
-      setFilteredNinos([])
-      return
-    }
-
-    setAcudiente(acudienteData)
-
-    const { data: ninosData, error: ninosError } = await supabase
+      const { data: ninosData, error: ninosError } = await supabase
         .from('nino_acudiente')
         .select(`
           ninos (
@@ -123,93 +110,70 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
             )
           )
         `)
+        .eq('acudiente_id', acudienteData.id)
 
-  .eq('acudiente_id', acudienteData.id)
-  // Aquí no se puede usar directamente ninos.guarderia_id en todas las versiones de Supabase.
-
-
-
-    if (ninosError || !ninosData) {
-      console.error('AttendanceControl - Error al cargar niños:', ninosError)
-      setMessage({ type: 'error', text: 'Error al cargar los niños' })
-      setNinos([])
-      setFilteredNinos([])
-      return
-    }
-
-    if (!user) {
-      setMessage({ type: 'error', text: 'Usuario no autenticado' })
-      return
-    }
-
-    const activeNinos: Nino[] = ninosData
-      .flatMap(item => {
-        const nino = item.ninos
-        const aula = Array.isArray(nino.aulas) ? nino.aulas[0] : nino.aulas
-        return {
-          ...nino,
-          aula
-        }
-      })
-      .filter(nino => nino.activo && nino.guarderia_id === user.guarderia_id)
-
-    if (activeNinos.length === 0) {
-      setMessage({ type: 'error', text: 'No hay niños activos asociados a este acudiente' })
-    } else {
-      setMessage({ type: 'success', text: `Acudiente encontrado con ${activeNinos.length} niño(s) activo(s)` })
-    }
-
-    setNinos(activeNinos)
-    setFilteredNinos(activeNinos)
-
-    if (activeNinos.length === 1) {
-      const onlyChild = activeNinos[0]
-      setSelectedNino(onlyChild.id)
-      setSelectedChildData(onlyChild)
-      checkIfEntradaExistsToday(onlyChild.id) // ✅ NUEVA LÍNEA CRUCIAL
-    }
-
-
-  } catch (error) {
-    console.error('AttendanceControl - Error general en búsqueda:', error)
-    setMessage({ type: 'error', text: 'Error al buscar el acudiente' })
-    setAcudiente(null)
-    setNinos([])
-    setFilteredNinos([])
-  } finally {
-    setLoading(false)
-  }
-}
-
-    const checkIfEntradaExistsToday = async (ninoId: string) => {
-    const today = new Date().toISOString().split('T')[0]
-
-          const { data, error } = await supabase
-            .from('registros_asistencia')
-            .select('id')
-            .eq('nino_id', ninoId)
-            .eq('tipo', 'entrada')
-            .eq('fecha', today)
-            .limit(1)
-
-          if (error) {
-            console.error('Error al verificar entrada de hoy:', error)
-            setHasEntradaToday(false)
-            setCanRegisterSalida(false)
-            return
-          }
-
-          const hasEntrada = data.length > 0
-          setHasEntradaToday(hasEntrada)
-          setCanRegisterSalida(hasEntrada)
+      if (ninosError || !ninosData) {
+        toast.error('Error al cargar los niños')
+        return
       }
 
+      const activeNinos: Nino[] = ninosData
+        .map((item) => {
+          const nino = item.ninos
+          return {
+            ...nino,
+            aula: Array.isArray(nino.aulas) ? nino.aulas[0] : nino.aulas,
+          }
+        })
+        .filter((nino) => nino.activo && nino.guarderia_id === user.guarderia_id)
 
+      setNinos(activeNinos)
+      setFilteredNinos(activeNinos)
+
+      if (activeNinos.length === 1) {
+        const nino = activeNinos[0]
+        setSelectedNino(nino.id)
+        setSelectedChildData(nino)
+        checkTodayAttendanceStatus(nino.id)
+      }
+
+      toast.success(`Acudiente encontrado con ${activeNinos.length} niño(s) activo(s)`)
+    } catch (error) {
+      console.error('Error general en búsqueda:', error)
+      toast.error('Error al buscar el acudiente')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const checkTodayAttendanceStatus = async (ninoId: string) => {
+    const today = getFechaHoyColombia()
+
+    const { data, error } = await supabase
+      .from('registros_asistencia')
+      .select('tipo')
+      .eq('nino_id', ninoId)
+      .eq('fecha', today)
+
+    if (error) {
+      setHasEntradaToday(false)
+      setHasSalidaToday(false)
+      setCanRegisterSalida(false)
+      return
+    }
+
+    const hasEntrada = data.some((r) => r.tipo === 'entrada')
+    const hasSalida = data.some((r) => r.tipo === 'salida')
+
+    setHasEntradaToday(hasEntrada)
+    setHasSalidaToday(hasSalida)
+    setCanRegisterSalida(hasEntrada && !hasSalida)
+  }
 
   const selectChild = (nino: Nino) => {
     setSelectedNino(nino.id)
     setSelectedChildData(nino)
-    checkIfEntradaExistsToday(nino.id)
+    checkTodayAttendanceStatus(nino.id)
     setShowChildrenModal(false)
     setChildSearch('')
   }
@@ -217,96 +181,74 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
   const clearChildSelection = () => {
     setSelectedNino('')
     setSelectedChildData(null)
+    setChildSearch('')
+  }
+
+  const handleDocumentSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    searchAcudiente(documentoAcudiente)
   }
 
   const registerAttendance = async () => {
-  if (!acudiente || !selectedNino || !user?.id) {
-    setMessage({ type: 'error', text: 'Faltan datos requeridos' })
-    return
-  }
+    if (!acudiente || !selectedNino || !user?.id) {
+      toast.error('Faltan datos requeridos')
+      return
+    }
 
-  if (tipo === 'entrada' && hasEntradaToday) {
-    setMessage({ type: 'error', text: 'Ya se registró la entrada hoy para este niño' })
-    return
-  }
+    if (tipo === 'entrada' && hasEntradaToday) {
+      toast.error('Ya se registró la entrada hoy para este niño')
+      return
+    }
 
-  if (tipo === 'salida' && !canRegisterSalida) {
-    setMessage({ type: 'error', text: 'Debe registrar una entrada antes de registrar la salida' })
-    return
-  }
+    if (tipo === 'salida' && (!hasEntradaToday || hasSalidaToday)) {
+      toast.error('Ya se registró la salida hoy o falta la entrada')
+      return
+    }
 
-  setLoading(true)
-  try {
-    const { error } = await supabase
-      .from('registros_asistencia')
-      .insert({
+    setLoading(true)
+
+    try {
+      const { error } = await supabase.from('registros_asistencia').insert({
         tipo,
         nino_id: selectedNino,
         acudiente_id: acudiente.id,
         usuario_registra_id: user.id,
         anotacion: anotacion.trim() || null,
-        guarderia_id: selectedChildData?.guarderia_id || user.guarderia_id || null,
-        aula_id: selectedChildData?.aula?.id || null 
+        guarderia_id: selectedChildData?.guarderia_id || user.guarderia_id,
+        aula_id: selectedChildData?.aula?.id || null,
+        fecha: getFechaHoyColombia(),
       })
 
-    if (error) {
-      setMessage({ type: 'error', text: 'Error al registrar la asistencia' })
-      return
+      if (error) {
+        toast.error('Error al registrar la asistencia')
+        return
+      }
+
+      toast.success(`Asistencia registrada exitosamente: ${tipo}`)
+
+      await checkTodayAttendanceStatus(selectedNino)
+
+      if (tipo === 'salida') {
+        clearChildSelection()
+        setDocumentoAcudiente('')
+        setAcudiente(null)
+        setNinos([])
+        setFilteredNinos([])
+        setAnotacion('')
+        setTipo('entrada')
+      }
+
+      if (onRegistrationComplete) onRegistrationComplete()
+    } catch (error) {
+      toast.error('Error al registrar la asistencia')
+    } finally {
+      setLoading(false)
     }
-
-    setMessage({ type: 'success', text: 'Asistencia registrada exitosamente' })
-
-    // Actualizar estados según tipo
-    if (tipo === 'entrada') {
-      await checkIfEntradaExistsToday(selectedNino)
-    } else if (tipo === 'salida') {
-      setHasEntradaToday(false)
-      setCanRegisterSalida(false)
-
-      // Limpiar todo
-      setSelectedChildData(null)
-      setSelectedNino('')
-      setChildSearch('')
-      setShowChildrenModal(false)
-      setAnotacion('')
-      setTipo('entrada')
-      setDocumentoAcudiente('')
-      setAcudiente(null)
-      setNinos([])
-      setFilteredNinos([])
-    }
-
-    // Notificar al componente padre si existe
-    if (onRegistrationComplete) {
-      onRegistrationComplete()
-    }
-
-  } catch (error) {
-    setMessage({ type: 'error', text: 'Error al registrar la asistencia' })
-  } finally {
-    setLoading(false)
   }
-}
-
-
-
-
-  const handleDocumentSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log('AttendanceControl - Búsqueda manual iniciada para:', documentoAcudiente)
-    searchAcudiente(documentoAcudiente)
-  }
-
-  useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => setMessage(null), 5000)
-      return () => clearTimeout(timer)
-    }
-  }, [message])
 
   return (
     <div className="p-6">
-      <div className="mb-8">
+     <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
           Control de Asistencia
         </h1>
@@ -315,24 +257,7 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
         </p>
       </div>
 
-      {message && (
-        <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
-          message.type === 'success' 
-            ? 'bg-green-50 border border-green-200' 
-            : 'bg-red-50 border border-red-200'
-        }`}>
-          {message.type === 'success' ? (
-            <CheckCircle className="w-5 h-5 text-green-600" />
-          ) : (
-            <XCircle className="w-5 h-5 text-red-600" />
-          )}
-          <span className={`text-sm font-medium ${
-            message.type === 'success' ? 'text-green-800' : 'text-red-800'
-          }`}>
-            {message.text}
-          </span>
-        </div>
-      )}
+     
 
       <div className="space-y-6">
         {/* Búsqueda de acudiente */}

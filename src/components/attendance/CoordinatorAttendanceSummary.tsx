@@ -1,60 +1,57 @@
-// project\src\components\attendance\AttendanceSummary.tsx
 import React, { useState, useEffect } from 'react'
-import { CalendarDays } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { CalendarDays } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { formatInTimeZone } from 'date-fns-tz'
+import toast from 'react-hot-toast'
 
-
-export function AttendanceSummary() {
+export function CoordinatorAttendanceSummary() {
   const { user } = useAuth()
-  const [selectedChild, setSelectedChild] = useState<any>(null)
-  const [showModal, setShowModal] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [childAcudientes, setChildAcudientes] = useState<any[]>([])
-  const [selectedAcudienteId, setSelectedAcudienteId] = useState<string | null>(null)
-  const maxDate = new Date().toISOString().split('T')[0]
-
-
+  const [guarderias, setGuarderias] = useState<any[]>([])
+  const [selectedGuarderia, setSelectedGuarderia] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [absentChildren, setAbsentChildren] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [showModal, setShowModal] = useState(false)
+  const [selectedChild, setSelectedChild] = useState<any>(null)
+  const [childAcudientes, setChildAcudientes] = useState<any[]>([])
+  const [selectedAcudienteId, setSelectedAcudienteId] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const itemsPerPage = 10
+  const maxDate = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
-  if (user?.guarderia_id) {
-    fetchAbsentChildrenForDate(selectedDate)
+    fetchGuarderias()
+  }, [])
+
+  useEffect(() => {
+    if (selectedGuarderia) {
+      fetchAbsentChildrenForDateAndGuarderia(selectedDate, selectedGuarderia)
+    }
+  }, [selectedDate, selectedGuarderia])
+
+  const fetchGuarderias = async () => {
+    const { data, error } = await supabase.from('guarderias').select('id, nombre')
+    if (!error && data) {
+      setGuarderias(data)
+      if (data.length > 0) setSelectedGuarderia(data[0].id)
+    }
   }
-}, [selectedDate, user?.guarderia_id])
 
-
-  const fetchAbsentChildrenForDate = async (date: Date) => {
-
+  const fetchAbsentChildrenForDateAndGuarderia = async (date: Date, guarderiaId: string) => {
     const fecha = formatInTimeZone(date, 'America/Bogota', 'yyyy-MM-dd')
 
     const { data: allChildren } = await supabase
       .from('ninos')
-      .select(`
-      id,
-      nombres,
-      apellidos,
-      guarderia_id,
-      aula_id,
-      aulas (
-        id,
-        nombre_aula
-      )
-    `)
-
-  .eq('activo', true)
-  .eq('guarderia_id', user?.guarderia_id)
-
-
+      .select(`id, nombres, apellidos, aula_id`)
+      .eq('activo', true)
+      .eq('guarderia_id', guarderiaId)
 
     const { data: attendanceToday } = await supabase
       .from('registros_asistencia')
       .select('nino_id')
       .eq('fecha', fecha)
+      .eq('guarderia_id', guarderiaId)
 
     if (!allChildren || !attendanceToday) return
 
@@ -77,9 +74,7 @@ export function AttendanceSummary() {
         nombre: `${a.acudientes.nombres} ${a.acudientes.apellidos}`
       }))
       setChildAcudientes(acudientesList)
-      if (acudientesList.length > 0) {
-        setSelectedAcudienteId(acudientesList[0].id)
-      }
+      if (acudientesList.length > 0) setSelectedAcudienteId(acudientesList[0].id)
     } else {
       setChildAcudientes([])
       setSelectedAcudienteId(null)
@@ -93,35 +88,37 @@ export function AttendanceSummary() {
 
   return (
     <div className="p-6">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Resumen de Asistencias</h1>
-          <p className="text-gray-600">Consulta de niños que no asistieron en un día seleccionado</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Resumen Coordinador</h1>
+          <p className="text-gray-600">Niños ausentes por guardería y fecha</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <select
+            value={selectedGuarderia ?? ''}
+            onChange={(e) => setSelectedGuarderia(e.target.value)}
+            className="px-4 py-2 border rounded-lg"
+          >
+            {guarderias.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.nombre}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            max={maxDate}
+            value={formattedDate}
+            onChange={(e) => {
+              setSelectedDate(new Date(`${e.target.value}T00:00:00`))
+            }}
+            className="px-4 py-2 border rounded-lg"
+          />
         </div>
       </div>
 
-      {/* Card */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        
-        {/* Fecha */}
-        <div className="mb-6 flex items-center gap-4">
-          <label className="text-sm font-medium text-gray-700">Selecciona una fecha:</label>
-          <input
-  type="date"
-  value={formattedDate}
-  max={maxDate} // ⬅️ evita fechas futuras
-  onChange={(e) => {
-    const parts = e.target.value.split('-')
-    setSelectedDate(new Date(`${e.target.value}T00:00:00`))
-
-  }}
-  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint-500 focus:border-mint-500"
-/>
-        </div>
-
-        {/* Título y total */}
-        <div className="mb-4 flex items-center justify-between">
+      <div className="bg-white border p-6 rounded-xl shadow-sm">
+        <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             <CalendarDays className="w-5 h-5 text-red-600" />
             Niños que no asistieron el {selectedDate.toLocaleDateString()}
@@ -132,7 +129,6 @@ export function AttendanceSummary() {
           </span>
         </div>
 
-        {/* Tabla */}
         {currentChildren.length > 0 ? (
           <>
             <div className="overflow-x-auto">
@@ -146,7 +142,7 @@ export function AttendanceSummary() {
                   {currentChildren.map((child) => (
                     <tr
                       key={child.id}
-                      className="hover:bg-gray-100 cursor-pointer transition"
+                      className="hover:bg-gray-100 cursor-pointer"
                       onClick={async () => {
                         setSelectedChild(child)
                         await fetchChildAcudientes(child.id)
@@ -162,12 +158,11 @@ export function AttendanceSummary() {
               </table>
             </div>
 
-            {/* Paginación */}
             <div className="flex justify-end items-center gap-4 pt-4">
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50"
+                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
               >
                 Anterior
               </button>
@@ -175,13 +170,9 @@ export function AttendanceSummary() {
                 Página {currentPage} de {totalPages}
               </span>
               <button
-                onClick={() =>
-                  setCurrentPage((prev) =>
-                    prev < totalPages ? prev + 1 : prev
-                  )
-                }
+                onClick={() => setCurrentPage((prev) => (prev < totalPages ? prev + 1 : prev))}
                 disabled={currentPage >= totalPages}
-                className="px-3 py-1 rounded bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50"
+                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
               >
                 Siguiente
               </button>
@@ -232,7 +223,6 @@ export function AttendanceSummary() {
               <button
                 disabled={isSubmitting || !selectedAcudienteId}
                 className="px-4 py-2 rounded-lg bg-mint-600 text-white hover:bg-mint-700 disabled:opacity-50"
-
                 onClick={async () => {
                   if (!selectedAcudienteId) {
                     alert('Selecciona un acudiente')
@@ -240,38 +230,33 @@ export function AttendanceSummary() {
                   }
 
                   setIsSubmitting(true)
-
                   const fecha = selectedDate.toISOString().split('T')[0]
                   const entrada = '08:00:00'
                   const salida = '15:00:00'
-
-                  const usuario_registra_id = '6857d438-e3c5-48bb-a91e-2effffa5483c'
-
+                  const usuario_registra_id = user?.id ?? 'system'
 
                   const { error: insertError } = await supabase.from('registros_asistencia').insert([
-                      {
-                        nino_id: selectedChild.id,
-                        fecha,
-                        tipo: 'entrada',
-                        hora: entrada,
-                        usuario_registra_id,
-                        acudiente_id: selectedAcudienteId,
-                        guarderia_id: user?.guarderia_id,
-                        aula_id: selectedChild.aula_id || selectedChild.aulas?.id || null, // ✅ añadido
-                      },
-                      {
-                        nino_id: selectedChild.id,
-                        fecha,
-                        tipo: 'salida',
-                        hora: salida,
-                        usuario_registra_id,
-                        acudiente_id: selectedAcudienteId,
-                        guarderia_id: user?.guarderia_id,
-                        aula_id: selectedChild.aula_id || selectedChild.aulas?.id || null, // ✅ añadido
-                      },
-                    ])
-
-
+                    {
+                      nino_id: selectedChild.id,
+                      fecha,
+                      tipo: 'entrada',
+                      hora: entrada,
+                      usuario_registra_id,
+                      acudiente_id: selectedAcudienteId,
+                      guarderia_id: selectedGuarderia,
+                      aula_id: selectedChild.aula_id
+                    },
+                    {
+                      nino_id: selectedChild.id,
+                      fecha,
+                      tipo: 'salida',
+                      hora: salida,
+                      usuario_registra_id,
+                      acudiente_id: selectedAcudienteId,
+                      guarderia_id: selectedGuarderia,
+                      aula_id: selectedChild.aula_id
+                    }
+                  ])
 
                   if (insertError) {
                     alert('Error al registrar asistencia: ' + insertError.message)
@@ -279,10 +264,11 @@ export function AttendanceSummary() {
                     return
                   }
 
+                  toast.success('Asistencia registrada correctamente')
                   setShowModal(false)
                   setSelectedChild(null)
                   setSelectedAcudienteId(null)
-                  await fetchAbsentChildrenForDate(selectedDate)
+                  await fetchAbsentChildrenForDateAndGuarderia(selectedDate, selectedGuarderia!)
                   setIsSubmitting(false)
                 }}
               >
@@ -295,3 +281,4 @@ export function AttendanceSummary() {
     </div>
   )
 }
+

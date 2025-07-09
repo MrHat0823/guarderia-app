@@ -1,3 +1,4 @@
+// project\src\components\management\GuarderiaManagement.tsx
 import React, { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Users, School } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -5,10 +6,9 @@ import { useGuarderias } from '../../hooks/useGuarderias'
 import type { User, Guarderia, UserRole } from '../../lib/types'
 import bcrypt from 'bcryptjs'
 import { useAuth } from '../../hooks/useAuth'
-
+import { toast } from 'sonner'
 
 export function GuarderiaManagement() {
-
   const { user } = useAuth()
   const { guarderias, refetch } = useGuarderias()
 
@@ -19,7 +19,6 @@ export function GuarderiaManagement() {
   })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,6 +35,7 @@ export function GuarderiaManagement() {
           })
           .eq('id', editingId)
         if (error) throw error
+        toast.success('Guardería actualizada correctamente')
       } else {
         const { error } = await supabase
           .from('guarderias')
@@ -45,6 +45,7 @@ export function GuarderiaManagement() {
             telefono: formData.telefono
           })
         if (error) throw error
+        toast.success('Guardería creada correctamente')
       }
 
       setFormData({ nombre: '', direccion: '', telefono: '' })
@@ -52,6 +53,7 @@ export function GuarderiaManagement() {
       await refetch()
     } catch (error) {
       console.error('Error al guardar guardería:', error)
+      toast.error('Error al guardar guardería')
     } finally {
       setLoading(false)
     }
@@ -68,90 +70,105 @@ export function GuarderiaManagement() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar esta guardería?')) return
-
     const { error } = await supabase.from('guarderias').delete().eq('id', id)
-    if (error) console.error(error)
-    else await refetch()
-  }
-
-
-const [usuarios, setUsuarios] = useState<User[]>([])
-const [editingUserId, setEditingUserId] = useState<string | null>(null)
-
-const defaultUserForm = {
-  nombres: '',
-  apellidos: '',
-  telefono: '',
-  numero_documento: '',
-  rol: 'profesor' as UserRole,
-  guarderia_id: '',
-  password: ''
-}
-
-
-const [userForm, setUserForm] = useState(defaultUserForm)
-
-const loadUsuarios = async () => {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .in('rol', ['admin', 'profesor', 'portero'])
-
-  if (!error) setUsuarios(data || [])
-}
-
-useEffect(() => {
-  loadUsuarios()
-}, [])
-
-const handleSubmitUser = async (e: React.FormEvent) => {
-  e.preventDefault()
-  setLoading(true)
-
-  try {
-    if (editingUserId) {
-      await supabase.from('users').update(userForm).eq('id', editingUserId)
+    if (error) {
+      console.error(error)
+      toast.error('Error al eliminar guardería')
     } else {
-      const hashedPassword = await bcrypt.hash(userForm.password, 10)
-
-      await supabase.from('users').insert({
-        ...userForm,
-        password: hashedPassword
-      })
+      toast.success('Guardería eliminada')
+      await refetch()
     }
-
-    setUserForm(defaultUserForm)
-    setEditingUserId(null)
-    await loadUsuarios()
-  } catch (err) {
-    console.error(err)
-  } finally {
-    setLoading(false)
   }
-}
 
+  const [usuarios, setUsuarios] = useState<User[]>([])
+  const [editingUserId, setEditingUserId] = useState<string | null>(null)
 
-const handleEditUser = (user: User) => {
-  setEditingUserId(user.id)
-  setUserForm({
-    nombres: user.nombres,
-    apellidos: user.apellidos,
-    telefono: user.telefono || '',
-    numero_documento: user.numero_documento,
-    rol: user.rol,
-    guarderia_id: user.guarderia_id || '',
-    password: '' // ✅ importante para que el formulario no rompa
-  })
-}
+  const defaultUserForm = {
+    nombres: '',
+    apellidos: '',
+    telefono: '',
+    numero_documento: '',
+    rol: 'profesor' as UserRole,
+    guarderia_id: '',
+    password: ''
+  }
 
+  const [userForm, setUserForm] = useState(defaultUserForm)
 
-const handleDeleteUser = async (id: string) => {
-  if (!confirm('¿Eliminar usuario?')) return
-  await supabase.from('users').delete().eq('id', id)
-  await loadUsuarios()
-}
+  const loadUsuarios = async () => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .in('rol', ['admin', 'profesor', 'portero'])
 
+    if (!error) setUsuarios(data || [])
+  }
 
+  useEffect(() => {
+    loadUsuarios()
+  }, [])
+
+  const handleSubmitUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      if (editingUserId) {
+        const updatedUser = { ...userForm }
+
+        if (userForm.password.trim() !== '') {
+          updatedUser.password = await bcrypt.hash(userForm.password, 10)
+          await supabase.from('users').update(updatedUser).eq('id', editingUserId)
+        } else {
+          const { password, ...rest } = updatedUser
+          await supabase.from('users').update(rest).eq('id', editingUserId)
+        }
+
+        toast.success('Usuario actualizado correctamente')
+      } else {
+        const hashedPassword = await bcrypt.hash(userForm.password, 10)
+        await supabase.from('users').insert({
+          ...userForm,
+          password: hashedPassword
+        })
+        toast.success('Usuario creado correctamente')
+      }
+
+      setUserForm(defaultUserForm)
+      setEditingUserId(null)
+      await loadUsuarios()
+    } catch (err) {
+      console.error('Error al guardar usuario:', err)
+      toast.error('Error al guardar usuario')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEditUser = (user: User) => {
+    setEditingUserId(user.id)
+    setUserForm({
+      nombres: user.nombres,
+      apellidos: user.apellidos,
+      telefono: user.telefono || '',
+      numero_documento: user.numero_documento,
+      rol: user.rol,
+      guarderia_id: user.guarderia_id || '',
+      password: ''
+    })
+  }
+
+  const handleDeleteUser = async (id: string) => {
+    if (!confirm('¿Eliminar usuario?')) return
+    const { error } = await supabase.from('users').delete().eq('id', id)
+    if (error) {
+      console.error(error)
+      toast.error('Error al eliminar usuario')
+    } else {
+      toast.success('Usuario eliminado correctamente')
+      await loadUsuarios()
+    }
+  }
 
   return (
   <div className="p-6 space-y-12">

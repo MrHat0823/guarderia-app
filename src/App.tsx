@@ -15,6 +15,8 @@ import { AttendanceSummary } from './components/attendance/AttendanceSummary'
 import { GuarderiaManagement } from './components/management/GuarderiaManagement'
 import { CoordinatorStatistics } from './components/statistics/CoordinatorStatistics'
 import { CoordinatorDashboard } from './components/dashboard/CoordinatorDashboard'
+import { CoordinatorAttendanceSummary } from './components/attendance/CoordinatorAttendanceSummary'
+
 import { Toaster } from 'react-hot-toast'
 
 
@@ -61,6 +63,10 @@ function App() {
     case 'coordinator-statistics':
       return user?.rol === 'coordinador'
         ? <CoordinatorStatistics />
+        : <div className="p-6 text-red-600 font-bold">Acceso denegado</div>
+    case 'coordinator-attendance-summary':
+      return user?.rol === 'coordinador'
+        ? <CoordinatorAttendanceSummary />
         : <div className="p-6 text-red-600 font-bold">Acceso denegado</div>
     case 'users':
       return <UserManagement />

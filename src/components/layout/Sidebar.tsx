@@ -74,7 +74,7 @@ const getMenuItems = () => {
  if (user?.rol === 'coordinador') {
   return [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'attendance-summary', label: 'Registro Personalizado', icon: CalendarSearch },
+    { id: 'coordinator-attendance-summary', label: 'Resumen de Asistencias', icon: CalendarSearch },
     { id: 'guarderias', label: 'Gestión de Guarderías', icon: School },
     { id: 'coordinator-statistics', label: 'Estadísticas Coordinador', icon: BarChart3 },
   ]
