@@ -1,19 +1,19 @@
+// project\src\components\Sidebar.tsx
 import React, { useState } from 'react'
-import { 
-  Home, 
-  Users, 
-  Baby, 
-  School, 
-  UserCheck, 
-  QrCode, 
-  BarChart3, 
+import {
+  Home,
+  Users,
+  Baby,
+  School,
+  UserCheck,
+  QrCode,
+  BarChart3,
   LogOut,
   Settings,
   CalendarSearch
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useDaycareConfig } from '../../hooks/useDaycareConfig'
-
 
 interface SidebarProps {
   activeTab: string
@@ -28,70 +28,59 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   const handleSignOut = async () => {
     if (isLoggingOut) return
-    
+
     setIsLoggingOut(true)
     console.log('Sidebar - Iniciando logout')
-    
+
     try {
       await signOut()
       console.log('Sidebar - Logout completado')
-      
-      // Pequeña pausa para mostrar el estado de "Cerrando..."
       setTimeout(() => {
         setIsLoggingOut(false)
-        // Forzar recarga para asegurar limpieza completa
         window.location.reload()
       }, 500)
-      
     } catch (error) {
       console.error('Sidebar - Error en logout:', error)
       setIsLoggingOut(false)
-      // Forzar recarga incluso si hay error
       window.location.reload()
     }
   }
 
-const getMenuItems = () => {
-  const commonItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'qr-scanner', label: 'Escáner QR', icon: QrCode },
-    { id: 'attendance-summary', label: 'Registro Personalizado', icon: CalendarSearch },
-    { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
-    { id: 'settings', label: 'Configuración', icon: Settings }
-  ]
+  const getMenuItems = () => {
+    const commonItems = [
+      { id: 'dashboard', label: 'Dashboard', icon: Home },
+      { id: 'qr-scanner', label: 'Escáner QR', icon: QrCode },
+      { id: 'attendance-summary', label: 'Registro Personalizado', icon: CalendarSearch },
+      { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
+      { id: 'settings', label: 'Configuración', icon: Settings }
+    ]
 
-  const adminItems = [
-    { id: 'users', label: 'Usuarios', icon: Users },
-    { id: 'children', label: 'Niños', icon: Baby },
-    { id: 'guardians', label: 'Acudientes', icon: Users },
-    { id: 'classrooms', label: 'Aulas', icon: School }
-  ]
+    const adminItems = [
+      { id: 'users', label: 'Usuarios', icon: Users },
+      { id: 'children', label: 'Niños', icon: Baby },
+      { id: 'guardians', label: 'Acudientes', icon: Users },
+      { id: 'classrooms', label: 'Aulas', icon: School }
+    ]
 
-  if (user?.rol === 'admin') {
-    return [...commonItems, ...adminItems]
+    if (user?.rol === 'admin') {
+      return [...commonItems, ...adminItems]
+    }
+
+    if (user?.rol === 'coordinador') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: Home },
+        { id: 'coordinator-attendance-summary', label: 'Resumen de Asistencias', icon: CalendarSearch },
+        { id: 'guarderias', label: 'Gestión de Guarderías', icon: School },
+        { id: 'coordinator-statistics', label: 'Estadísticas Coordinador', icon: BarChart3 },
+      ]
+    }
+
+    return commonItems
   }
 
- if (user?.rol === 'coordinador') {
-  return [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'coordinator-attendance-summary', label: 'Resumen de Asistencias', icon: CalendarSearch },
-    { id: 'guarderias', label: 'Gestión de Guarderías', icon: School },
-    { id: 'coordinator-statistics', label: 'Estadísticas Coordinador', icon: BarChart3 },
-  ]
-}
+  const menuItems = getMenuItems()
 
-
-  return commonItems
-}
-
-
-// ✅ ESTA LÍNEA DEBE ESTAR FUERA
-const menuItems = getMenuItems()
-
-
-  if (!user) {
-    return null
-  }
+  if (!user) return null
 
   return (
     <div className="w-64 bg-white shadow-lg h-screen flex flex-col">
@@ -101,13 +90,10 @@ const menuItems = getMenuItems()
             <Baby className="w-6 h-6 text-mint-600" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              {daycareNombre}
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900">{daycareNombre}</h2>
             <p className="text-sm text-gray-500">
-            {user?.rol === 'coordinador' ? '' : 'Sistema de gestión'}
-          </p>
-
+              {user?.rol === 'coordinador' ? '' : 'Sistema de gestión'}
+            </p>
           </div>
         </div>
       </div>
@@ -140,12 +126,8 @@ const menuItems = getMenuItems()
           <p className="text-sm font-medium text-gray-900">
             {user.nombres} {user.apellidos}
           </p>
-          <p className="text-xs text-gray-500 capitalize">
-            {user.rol}
-          </p>
-          <p className="text-xs text-gray-500">
-            Doc: {user.numero_documento}
-          </p>
+          <p className="text-xs text-gray-500 capitalize">{user.rol}</p>
+          <p className="text-xs text-gray-500">Doc: {user.numero_documento}</p>
         </div>
         <button
           onClick={handleSignOut}
@@ -164,10 +146,9 @@ const menuItems = getMenuItems()
             </>
           )}
         </button>
-          <p className="text-center text-[11px] text-gray-400 mt-4">
-            Versión {appVersion}
-          </p>
-
+        <p className="text-center text-[11px] text-gray-400 mt-4">
+          Versión {appVersion}
+        </p>
       </div>
     </div>
   )
