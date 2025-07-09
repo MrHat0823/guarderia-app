@@ -3,7 +3,8 @@ import { supabase } from '../../lib/supabase'
 import { CalendarDays } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { formatInTimeZone } from 'date-fns-tz'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
+
 
 export function CoordinatorAttendanceSummary() {
   const { user } = useAuth()

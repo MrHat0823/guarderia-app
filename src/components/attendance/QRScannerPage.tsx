@@ -1,3 +1,4 @@
+// project\src\components\attendance\QRScannerPage.tsx
 import React, { useState } from 'react'
 import {
   QrCode,
@@ -11,7 +12,7 @@ import {
 import { QRScanner } from './QRScanner'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { format, toZonedTime } from 'date-fns-tz'
 
 const successSound = new Audio('/sounds/scan-success.mp3')

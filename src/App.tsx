@@ -20,7 +20,7 @@ import { CoordinatorAttendanceSummary } from './components/attendance/Coordinato
 import { SidebarHamburger } from './components/layout/SidebarHamburger'
 
 
-import { Toaster } from 'react-hot-toast'
+import { Toaster } from 'sonner' //
 
 
 function App() {
@@ -111,16 +111,12 @@ function App() {
       {renderContent()}
     </main>
 
+    {/* ✅ Toaster de 'sonner' */}
     <Toaster
       position="top-right"
+      richColors
       toastOptions={{
-        duration: 4000,
-        style: {
-          background: '#fff',
-          color: '#333',
-          border: '1px solid #ddd',
-          padding: '12px 16px',
-        },
+        duration: 4000
       }}
     />
   </div>

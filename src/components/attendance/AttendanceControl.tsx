@@ -18,7 +18,8 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import type { Acudiente, Nino, AttendanceType } from '../../lib/types'
 import { format, toZonedTime } from 'date-fns-tz'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
+
 
 interface AttendanceControlProps {
   initialDocumento?: string
