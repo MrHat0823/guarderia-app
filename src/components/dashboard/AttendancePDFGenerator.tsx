@@ -126,15 +126,15 @@ export default function AttendancePDFGenerator() {
   startY: 30,
   head: [[
     'Niño',
-    'Tipo Doc Niño',
-    'Doc Niño',
+    'Tipo documento',
+    'Número de docuemnto',
     'Acudiente',
-    'Tipo Doc Acudiente',
-    'Doc Acudiente',
+    'Tipo ocuemnto Acudiente',
+    'Número de documento Acudiente',
     'Fecha',
     'Hora Entrada',
     'Hora Salida',
-    ...(selectedAula ? [] : ['Aula']) // 👈 Solo si no se seleccionó aula
+    ...(selectedAula ? [] : ['Aula']) //  Solo si no se seleccionó aula
   ]],
   body: registrosAgrupados.map(r => [
     `${r.nino.nombres} ${r.nino.apellidos}`,
