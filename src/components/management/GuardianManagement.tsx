@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabase'
 import type { Acudiente, Nino, TipoParentesco } from '../../lib/types'
 import QRCode from 'qrcode'
 import { useAuth } from '../../hooks/useAuth'
+import { toast } from 'sonner'
+
 
 
 interface ChildWithRelationship {
@@ -21,8 +23,6 @@ interface ChildWithRelationship {
 }
 
 export function GuardianManagement() {
-  const [formError, setFormError] = useState('')
-  const [formSuccess, setFormSuccess] = useState('')
   const { user } = useAuth()
   const [guardians, setGuardians] = useState<Acudiente[]>([])
   const [children, setChildren] = useState<Nino[]>([])
@@ -117,7 +117,7 @@ const fetchGuardians = async () => {
         )
       `)
       .eq('activo', true)
-      .eq('guarderia_id', user?.guarderia_id) // ✅ filtro agregado
+      .eq('guarderia_id', user?.guarderia_id) // filtro agregado
       .order('nombres')
 
     if (error) throw error
@@ -174,17 +174,15 @@ const fetchGuardians = async () => {
 
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault()
-  setFormError('')
-  setFormSuccess('')
 
   try {
     if (!user?.guarderia_id) {
-      setFormError('No se puede guardar el acudiente porque no se encontró una guardería asociada al usuario actual.')
+      toast.error('No se encontró una guardería asociada al usuario actual.')
       return
     }
 
     if (!editingGuardian) {
-      // Verificar si ya existe ese número de documento
+
       const { data: existing, error: existingError } = await supabase
         .from('acudientes')
         .select('id')
@@ -194,7 +192,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       if (existingError) throw existingError
 
       if (existing) {
-        setFormError('Ya existe un acudiente con ese número de documento.')
+        toast.warning('Ya existe un acudiente con ese número de documento.')
         return
       }
 
@@ -202,53 +200,79 @@ const handleSubmit = async (e: React.FormEvent) => {
         .from('acudientes')
         .insert([{
           ...formData,
-          guarderia_id: user.guarderia_id  // ✅ se asigna automáticamente
+          guarderia_id: user.guarderia_id
         }])
 
       if (error) throw error
 
-      setFormSuccess('Acudiente creado correctamente.')
+      toast.success('Acudiente creado correctamente.')
     } else {
-      const { error } = await supabase
-        .from('acudientes')
-        .update(formData)
-        .eq('id', editingGuardian.id)
+  // Validar duplicado en otro acudiente
+  const { data: existing, error: existingError } = await supabase
+    .from('acudientes')
+    .select('id')
+    .eq('numero_documento', formData.numero_documento)
+    .neq('id', editingGuardian.id)
+    .maybeSingle()
 
-      if (error) throw error
-
-      setFormSuccess('Acudiente actualizado correctamente.')
-    }
-
-    await fetchGuardians()
-
-    setTimeout(() => {
-      setFormSuccess('')
-      resetForm()
-    }, 2000)
-  } catch (error) {
-    console.error('Error saving guardian:', error)
-    setFormError('Ocurrió un error al guardar el acudiente.')
+  if (existingError) throw existingError
+  if (existing) {
+    toast.warning('Ya existe un acudiente con ese número de documento.')
+    return
   }
+
+  const { error } = await supabase
+    .from('acudientes')
+    .update({
+      nombres: formData.nombres,
+      apellidos: formData.apellidos,
+      tipo_documento: formData.tipo_documento,
+      numero_documento: formData.numero_documento,
+      telefono1: formData.telefono1,
+      telefono2: formData.telefono2,
+      email: formData.email,
+      direccion: formData.direccion
+    })
+    .eq('id', editingGuardian.id)
+
+  if (error) throw error
+
+  toast.success('Acudiente actualizado correctamente.')
 }
 
 
+    await fetchGuardians()
+    resetForm()
 
+  } catch (error) {
+    toast.error('Ocurrió un error al guardar el acudiente.')
+  }
+}
+
+  
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Está seguro de eliminar este acudiente? Esto también eliminará todas sus relaciones con los niños.')) return
-    
+  const confirmDeletion = async () => {
     try {
-      const { error } = await supabase
-        .from('acudientes')
-        .delete()
-        .eq('id', id)
-      
+      const { error } = await supabase.from('acudientes').delete().eq('id', id)
       if (error) throw error
       await fetchGuardians()
+      toast.success('Acudiente eliminado correctamente.')
     } catch (error) {
       console.error('Error deleting guardian:', error)
+      toast.error('Ocurrió un error al eliminar el acudiente.')
     }
   }
+
+  toast.warning('¿Estás seguro de eliminar este acudiente? Esto también eliminará todas sus relaciones con los niños.', {
+    action: {
+      label: 'Eliminar',
+      onClick: confirmDeletion,
+    },
+  })
+}
+
+
 
   const handleEdit = (guardian: Acudiente) => {
     setEditingGuardian(guardian)
@@ -446,8 +470,7 @@ const handleLinkChildren = async () => {
       qrImage.src = qrDataURL
       
     } catch (error) {
-      console.error('Error generando código QR:', error)
-      alert('Error al generar el código QR. Por favor, inténtelo de nuevo.')
+       toast.error('Error al generar el código QR. Por favor, inténtelo de nuevo.')
       setGeneratingQR(null)
     }
   }
@@ -484,20 +507,6 @@ const handleLinkChildren = async () => {
               <h2 className="text-xl font-bold text-gray-900 mb-6">
                 {editingGuardian ? 'Editar Acudiente' : 'Nuevo Acudiente'}
               </h2>
-              
-            {formError && (
-              <div className="mb-4 p-3 rounded bg-red-100 text-red-700 border border-red-300">
-                {formError}
-              </div>
-            )}
-
-            {formSuccess && (
-                <div className="mb-4 p-3 rounded bg-green-100 text-green-700 border border-green-300">
-                  {formSuccess}
-                </div>
-              )}
-
-
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

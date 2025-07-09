@@ -69,22 +69,29 @@ export function UserManagement() {
 
     try {
       if (editingUser) {
-        // Update existing user
+        const updates: Partial<User> = {
+          nombres: formData.nombres,
+          apellidos: formData.apellidos,
+          rol: formData.rol,
+          tipo_documento: formData.tipo_documento,
+          numero_documento: formData.numero_documento,
+          telefono: formData.telefono
+        }
+
+        // Solo actualiza la contraseña si el usuario ingresó una nueva
+        if (formData.password.trim()) {
+          updates.password = await bcrypt.hash(formData.password, 10)
+        }
+
         const { error } = await supabase
           .from('users')
-          .update({
-            nombres: formData.nombres,
-            apellidos: formData.apellidos,
-            password: formData.password,
-            rol: formData.rol,
-            tipo_documento: formData.tipo_documento,
-            numero_documento: formData.numero_documento,
-            telefono: formData.telefono
-          })
+          .update(updates)
           .eq('id', editingUser.id)
 
         if (error) throw error
-      } else {
+      }
+
+ else {
         // Create new user
         await createUser(formData)
       }
@@ -249,7 +256,7 @@ export function UserManagement() {
                     maxLength={6}
                     pattern="[0-9]{6}"
                     placeholder="••••••"
-                    required
+                     required={!editingUser}
                   />
                 </div>
                 <div>

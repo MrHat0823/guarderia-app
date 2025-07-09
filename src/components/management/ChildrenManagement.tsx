@@ -1,16 +1,17 @@
+// project\src\components\management\ChildrenManagement.tsx
 import React, { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Baby, School } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Nino, Aula } from '../../lib/types'
 import { useAuth } from '../../hooks/useAuth'
+import { toast } from 'sonner'
+
 
 
 
 
 export function ChildrenManagement() {
   
-  const [formError, setFormError] = useState('')
-  const [formSuccess, setFormSuccess] = useState('')
   const { user } = useAuth()
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
@@ -60,7 +61,7 @@ useEffect(() => {
           nivel_educativo
         )
       `, { count: 'exact' })
-      .eq('guarderia_id', user.guarderia_id) // 👈 FILTRO AÑADIDO
+      .eq('guarderia_id', user.guarderia_id) // FILTRO AÑADIDO
       .order('nombres')
       .range(from, to)
 
@@ -89,7 +90,7 @@ useEffect(() => {
     const { data, error } = await supabase
       .from('aulas')
       .select('*')
-      .eq('guarderia_id', user.guarderia_id) // ✅ Filtro por guardería
+      .eq('guarderia_id', user.guarderia_id) // Filtro por guardería
       .order('nombre_aula')
 
     if (error) throw error
@@ -103,8 +104,7 @@ useEffect(() => {
  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault()
   setLoading(true)
-  setFormError('')
-  setFormSuccess('')
+
 
   try {
     const childData = {
@@ -113,7 +113,7 @@ useEffect(() => {
       tipo_documento: formData.tipo_documento,
       numero_documento: formData.numero_documento,
       aula_id: formData.aula_id || null,
-      guarderia_id: user?.guarderia_id, // ✅ Asignación automática
+      guarderia_id: user?.guarderia_id, // Asignación automática
       activo: formData.activo
     }
 
@@ -125,7 +125,7 @@ useEffect(() => {
 
       if (error) throw error
 
-      setFormSuccess('Niño actualizado correctamente.')
+      toast.success('Niño actualizado correctamente')
     } else {
       // Verificar si ya existe el número de documento
       const { data: existing, error: existingError } = await supabase
@@ -137,7 +137,7 @@ useEffect(() => {
       if (existingError) throw existingError
 
       if (existing) {
-        setFormError('Ya existe un niño con ese número de documento.')
+        toast.error('Ya existe un niño con ese número de documento')
         return
       }
 
@@ -147,7 +147,7 @@ useEffect(() => {
 
       if (error) throw error
 
-      setFormSuccess('Niño creado correctamente.')
+      toast.success('Niño creado correctamente')
     }
 
     await loadChildren()
@@ -162,10 +162,8 @@ useEffect(() => {
       activo: true
     })
 
-    setTimeout(() => setFormSuccess(''), 3000)
   } catch (error) {
-    console.error('Error saving child:', error)
-    setFormError('Ocurrió un error al guardar el niño.')
+    toast.error('Ocurrió un error al guardar el niño')
   } finally {
     setLoading(false)
   }
@@ -186,20 +184,45 @@ useEffect(() => {
   }
 
   const handleDelete = async (childId: string) => {
-    if (!confirm('¿Está seguro de que desea eliminar este niño?')) return
+  toast.custom((t) => (
+    <div className="bg-white shadow-lg rounded-lg p-4 border border-gray-200 w-[320px]">
+      <h3 className="font-semibold text-gray-800 text-sm">¿Eliminar niño?</h3>
+      <p className="text-gray-600 text-sm mt-1">Esta acción no se puede deshacer.</p>
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          onClick={() => toast.dismiss(t)}
+          className="px-3 py-1 rounded bg-gray-200 text-gray-800 text-sm hover:bg-gray-300"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={async () => {
+            try {
+              const { error } = await supabase
+                .from('ninos')
+                .delete()
+                .eq('id', childId)
 
-    try {
-      const { error } = await supabase
-        .from('ninos')
-        .delete()
-        .eq('id', childId)
+              if (error) throw error
 
-      if (error) throw error
-      await loadChildren()
-    } catch (error) {
-      console.error('Error deleting child:', error)
-    }
-  }
+              await loadChildren()
+              toast.success('Niño eliminado correctamente')
+            } catch (error) {
+              console.error('Error deleting child:', error)
+              toast.error('Error al eliminar el niño')
+            } finally {
+              toast.dismiss(t)
+            }
+          }}
+          className="px-3 py-1 rounded bg-red-600 text-white text-sm hover:bg-red-700"
+        >
+          Eliminar
+        </button>
+      </div>
+    </div>
+  ))
+}
+
 
   if (loading && children.length === 0) {
     return (
@@ -238,16 +261,6 @@ useEffect(() => {
               </h2>
               <form onSubmit={handleSubmit} className="space-y-4">
 
-                {formError && (
-                    <p className="text-red-600 text-sm bg-red-100 border border-red-200 p-2 rounded-lg">
-                      {formError}
-                    </p>
-                  )}
-                  {formSuccess && (
-                    <p className="text-green-600 text-sm bg-green-100 border border-green-200 p-2 rounded-lg">
-                      {formSuccess}
-                    </p>
-                  )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
