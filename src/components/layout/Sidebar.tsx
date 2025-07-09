@@ -1,3 +1,4 @@
+// project\src\components\layout\Sidebar.tsx
 import React, { useState, useEffect } from 'react'
 import {
   Home, Users, Baby, School, QrCode, BarChart3,
@@ -45,7 +46,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     const common = [
       { id: 'dashboard', label: 'Dashboard', icon: Home },
       { id: 'qr-scanner', label: 'Escáner QR', icon: QrCode },
-      { id: 'attendance-summary', label: 'Registro Personalizado', icon: CalendarSearch },
+      { id: 'attendance-summary', label: user?.rol === 'coordinador' ? 'Resumen de Asistencias' : 'Registro Personalizado', icon: CalendarSearch },
       { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
       { id: 'settings', label: 'Configuración', icon: Settings }
     ]

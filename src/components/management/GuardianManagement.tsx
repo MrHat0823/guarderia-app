@@ -1,3 +1,4 @@
+//project\src\components\management\GuardianManagement.tsx
 import React, { useState, useEffect } from 'react'
 import { Plus, Edit2, Trash2, Users, Phone, Mail, MapPin, Link, Heart, QrCode, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -45,10 +46,11 @@ export function GuardianManagement() {
   })
 
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
   const itemsPerPage = 10
-  const totalPages = Math.ceil(totalCount / itemsPerPage)
-  const [guardianSearchTerm, setGuardianSearchTerm] = useState('')
+  const [totalCount, setTotalCount] = useState(0)
+  const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage))
+  const [searchTerm, setSearchTerm] = useState('')
+
 
 
 
@@ -61,25 +63,14 @@ useEffect(() => {
   if (user?.guarderia_id) {
     fetchGuardians()
   }
-}, [currentPage, user])
+}, [currentPage, searchTerm, user])
+
 
 useEffect(() => {
   if (user?.guarderia_id) {
     fetchChildren()
   }
-}, [user]) // 👈 Se ejecuta cuando `user` esté listo
-
-
-const filteredGuardians = guardians.filter((g) => {
-  const fullName = `${g.nombres} ${g.apellidos}`.toLowerCase()
-  const document = g.numero_documento.toLowerCase()
-  const search = guardianSearchTerm.toLowerCase()
-
-  return (
-    fullName.includes(search) ||
-    document.includes(search)
-  )
-})
+}, [user]) //  Se ejecuta cuando `user` esté listo
 
 
 
@@ -88,12 +79,18 @@ const fetchGuardians = async () => {
     const from = (currentPage - 1) * itemsPerPage
     const to = from + itemsPerPage - 1
 
-    const { data, count, error } = await supabase
+    let query = supabase
       .from('acudientes')
       .select('*', { count: 'exact' })
-      .eq('guarderia_id', user?.guarderia_id) // ✅ filtro agregado
+      .eq('guarderia_id', user?.guarderia_id)
       .order('nombres')
       .range(from, to)
+
+    if (searchTerm.trim() !== '') {
+      query = query.or(`nombres.ilike.%${searchTerm}%,apellidos.ilike.%${searchTerm}%,numero_documento.ilike.%${searchTerm}%`)
+    }
+
+    const { data, count, error } = await query
 
     if (error) throw error
     setGuardians(data || [])
@@ -104,6 +101,7 @@ const fetchGuardians = async () => {
     setLoading(false)
   }
 }
+
 
 
 
@@ -332,7 +330,7 @@ const handleLinkChildren = async () => {
     const { error } = await supabase
       .from('nino_acudiente')
       .upsert(relationships, {
-        onConflict: 'nino_id,acudiente_id' // ⚠️ Usa la constraint única que ya definiste
+        onConflict: 'nino_id,acudiente_id' // Usa la constraint única que ya definiste
       })
 
     if (error) throw error
@@ -643,7 +641,8 @@ const handleLinkChildren = async () => {
                   placeholder="Buscar niños por nombre o documento..."
                   value={childSearchTerm}
                   onChange={(e) => setChildSearchTerm(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint-500 focus:border-transparent"
+                 className="px-3 py-2 border border-gray-300 rounded-lg w-full md:w-80 focus:ring-2 focus:ring-mint-500 focus:outline-none"
+
                 />
               </div>
               
@@ -757,8 +756,13 @@ const handleLinkChildren = async () => {
   <input
     type="text"
     placeholder="Buscar por nombre o documento..."
-    value={guardianSearchTerm}
-    onChange={(e) => setGuardianSearchTerm(e.target.value)}
+
+    value={searchTerm}
+    onChange={(e) => {
+      setSearchTerm(e.target.value)
+      setCurrentPage(1)
+    }}
+
     className="px-3 py-2 border border-gray-300 rounded-lg w-full md:w-80 focus:ring-2 focus:ring-mint-500 focus:outline-none"
   />
 </div>
@@ -776,7 +780,8 @@ const handleLinkChildren = async () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredGuardians.map((guardian) => (
+              {guardians.map((guardian) => (
+
 
                 <tr key={guardian.id} className="hover:bg-gray-50">
                   <td className="py-3 px-4">
@@ -880,8 +885,7 @@ const handleLinkChildren = async () => {
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1 border rounded disabled:opacity-50"
-              >
+                className="px-3 py-1 border rounded disabled:opacity-50">
                 Siguiente
               </button>
             </div>

@@ -18,6 +18,8 @@ import { CoordinatorStatistics } from './components/statistics/CoordinatorStatis
 import { CoordinatorDashboard } from './components/dashboard/CoordinatorDashboard'
 import { CoordinatorAttendanceSummary } from './components/attendance/CoordinatorAttendanceSummary'
 import { SidebarHamburger } from './components/layout/SidebarHamburger'
+import { UsersAttendanceSummary } from './components/attendance/UsersAttendanceSummary'
+
 
 
 import { Toaster } from 'sonner' //
@@ -82,7 +84,12 @@ function App() {
     case 'settings':
       return <UserSettings />
     case 'attendance-summary':
-      return <AttendanceSummary />
+      if (user?.rol === 'coordinador') {
+        return <AttendanceSummary />
+      } else {
+        return <UsersAttendanceSummary />
+      }
+
     case 'guarderias':
       return user?.rol === 'coordinador'
         ? <GuarderiaManagement />

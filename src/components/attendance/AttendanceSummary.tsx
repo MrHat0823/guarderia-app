@@ -116,6 +116,7 @@ export function AttendanceSummary() {
     setSelectedDate(new Date(`${e.target.value}T00:00:00`))
 
   }}
+  
   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint-500 focus:border-mint-500"
 />
         </div>
