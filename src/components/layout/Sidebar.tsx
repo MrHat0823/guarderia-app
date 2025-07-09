@@ -1,19 +1,11 @@
-// project\src\components\Sidebar.tsx
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
-  Home,
-  Users,
-  Baby,
-  School,
-  UserCheck,
-  QrCode,
-  BarChart3,
-  LogOut,
-  Settings,
-  CalendarSearch
+  Home, Users, Baby, School, QrCode, BarChart3,
+  LogOut, Settings, CalendarSearch, Menu
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useDaycareConfig } from '../../hooks/useDaycareConfig'
+
 
 interface SidebarProps {
   activeTab: string
@@ -21,51 +13,49 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
-  const appVersion = import.meta.env.VITE_APP_VERSION
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const { user, signOut } = useAuth()
   const { daycareNombre } = useDaycareConfig()
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const appVersion = import.meta.env.VITE_APP_VERSION
+
+  useEffect(() => {
+        const handleOpen = () => setIsMobileOpen(true)
+        window.addEventListener('open-sidebar', handleOpen)
+        return () => window.removeEventListener('open-sidebar', handleOpen)
+      }, [])
 
   const handleSignOut = async () => {
     if (isLoggingOut) return
-
     setIsLoggingOut(true)
-    console.log('Sidebar - Iniciando logout')
-
     try {
       await signOut()
-      console.log('Sidebar - Logout completado')
       setTimeout(() => {
         setIsLoggingOut(false)
         window.location.reload()
       }, 500)
     } catch (error) {
-      console.error('Sidebar - Error en logout:', error)
+      console.error('Error en logout:', error)
       setIsLoggingOut(false)
       window.location.reload()
     }
   }
 
   const getMenuItems = () => {
-    const commonItems = [
+    const common = [
       { id: 'dashboard', label: 'Dashboard', icon: Home },
       { id: 'qr-scanner', label: 'Escáner QR', icon: QrCode },
       { id: 'attendance-summary', label: 'Registro Personalizado', icon: CalendarSearch },
       { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
       { id: 'settings', label: 'Configuración', icon: Settings }
     ]
-
-    const adminItems = [
+    const admin = [
       { id: 'users', label: 'Usuarios', icon: Users },
       { id: 'children', label: 'Niños', icon: Baby },
       { id: 'guardians', label: 'Acudientes', icon: Users },
       { id: 'classrooms', label: 'Aulas', icon: School }
     ]
-
-    if (user?.rol === 'admin') {
-      return [...commonItems, ...adminItems]
-    }
-
+    if (user?.rol === 'admin') return [...common, ...admin]
     if (user?.rol === 'coordinador') {
       return [
         { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -74,8 +64,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         { id: 'coordinator-statistics', label: 'Estadísticas Coordinador', icon: BarChart3 },
       ]
     }
-
-    return commonItems
+    return common
   }
 
   const menuItems = getMenuItems()
@@ -83,73 +72,92 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   if (!user) return null
 
   return (
-    <div className="w-64 bg-white shadow-lg h-screen flex flex-col">
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-mint-100 rounded-full flex items-center justify-center">
-            <Baby className="w-6 h-6 text-mint-600" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">{daycareNombre}</h2>
-            <p className="text-sm text-gray-500">
-              {user?.rol === 'coordinador' ? '' : 'Sistema de gestión'}
-            </p>
+    <>
+      
+      {/* Overlay en móviles */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-30 z-40 md:hidden"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div
+        className={`
+          fixed md:relative z-50 md:z-auto top-0 left-0 h-full bg-white shadow-lg flex flex-col transition-transform duration-300
+          ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} 
+          md:translate-x-0 md:w-64
+        `}
+      >
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-mint-100 rounded-full flex items-center justify-center">
+              <Baby className="w-6 h-6 text-mint-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">{daycareNombre}</h2>
+              <p className="text-sm text-gray-500">
+                {user?.rol === 'coordinador' ? '' : 'Sistema de gestión'}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <nav className="flex-1 p-4">
-        <ul className="space-y-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <li key={item.id}>
+        <nav className="flex-1 p-4">
+          <ul className="space-y-2">
+            {menuItems.map(({ id, label, icon: Icon }) => (
+              <li key={id}>
                 <button
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => {
+                    setActiveTab(id)
+                    setIsMobileOpen(false)
+                  }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                    activeTab === item.id
+                    activeTab === id
                       ? 'bg-mint-100 text-mint-700 border-r-2 border-mint-600'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
                   <Icon className="w-5 h-5" />
-                  {item.label}
+                  {label}
                 </button>
               </li>
-            )
-          })}
-        </ul>
-      </nav>
+            ))}
+          </ul>
+        </nav>
 
-      <div className="p-4 border-t border-gray-200">
-        <div className="mb-4">
-          <p className="text-sm font-medium text-gray-900">
-            {user.nombres} {user.apellidos}
+        <div className="p-4 border-t border-gray-200">
+          <div className="mb-4">
+            <p className="text-sm font-medium text-gray-900">
+              {user.nombres} {user.apellidos}
+            </p>
+            <p className="text-xs text-gray-500 capitalize">{user.rol}</p>
+            <p className="text-xs text-gray-500">Doc: {user.numero_documento}</p>
+          </div>
+          <button
+            onClick={handleSignOut}
+            disabled={isLoggingOut}
+            className="w-full flex items-center gap-3 px-4 py-2 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoggingOut ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
+                Cerrando...
+              </>
+            ) : (
+              <>
+                <LogOut className="w-5 h-5" />
+                Cerrar sesión
+              </>
+            )}
+          </button>
+          <p className="text-center text-[11px] text-gray-400 mt-4">
+            Versión {appVersion}
           </p>
-          <p className="text-xs text-gray-500 capitalize">{user.rol}</p>
-          <p className="text-xs text-gray-500">Doc: {user.numero_documento}</p>
         </div>
-        <button
-          onClick={handleSignOut}
-          disabled={isLoggingOut}
-          className="w-full flex items-center gap-3 px-4 py-2 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isLoggingOut ? (
-            <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
-              Cerrando...
-            </>
-          ) : (
-            <>
-              <LogOut className="w-5 h-5" />
-              Cerrar sesión
-            </>
-          )}
-        </button>
-        <p className="text-center text-[11px] text-gray-400 mt-4">
-          Versión {appVersion}
-        </p>
       </div>
-    </div>
+    </>
   )
 }
+

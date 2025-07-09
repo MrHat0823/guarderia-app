@@ -1,3 +1,4 @@
+// project\src\App.tsx
 import React, { useState, useEffect } from 'react'
 import { LoginForm } from './components/auth/LoginForm'
 import { Sidebar } from './components/layout/Sidebar'
@@ -16,6 +17,8 @@ import { GuarderiaManagement } from './components/management/GuarderiaManagement
 import { CoordinatorStatistics } from './components/statistics/CoordinatorStatistics'
 import { CoordinatorDashboard } from './components/dashboard/CoordinatorDashboard'
 import { CoordinatorAttendanceSummary } from './components/attendance/CoordinatorAttendanceSummary'
+import { SidebarHamburger } from './components/layout/SidebarHamburger'
+
 
 import { Toaster } from 'react-hot-toast'
 
@@ -93,13 +96,21 @@ function App() {
 
 
   return (
-  <div className="min-h-screen bg-gray-50 flex">
+
+  <div className="min-h-screen bg-gray-50 flex relative">
+    {/* Botón hamburguesa visible solo en móvil */}
+    <div className="absolute top-4 left-4 z-50 md:hidden">
+      <SidebarHamburger setActiveTab={setActiveTab} />
+    </div>
+
+    {/* Sidebar */}
     <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+
+    {/* Contenido principal */}
     <main className="flex-1 overflow-auto">
       {renderContent()}
     </main>
 
-    {/* Añadir esto para que funcionen los toasts globalmente */}
     <Toaster
       position="top-right"
       toastOptions={{
@@ -114,7 +125,6 @@ function App() {
     />
   </div>
 )
-
   
 }
 
