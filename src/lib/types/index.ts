@@ -1,6 +1,16 @@
 export type UserRole = 'coordinador' | 'admin' | 'profesor' | 'portero'
 export type AttendanceType = 'entrada' | 'salida'
-export type TipoParentesco = 'Madre' | 'Padre' | 'Hermano' | 'Hermana' | 'Tío' | 'Tía' | 'Abuelo' | 'Abuela' | 'Tutor Legal' | 'Otro'
+export type TipoParentesco =
+  | 'Madre'
+  | 'Padre'
+  | 'Hermano'
+  | 'Hermana'
+  | 'Tío'
+  | 'Tía'
+  | 'Abuelo'
+  | 'Abuela'
+  | 'Tutor Legal'
+  | 'Otro'
 
 export interface User {
   id: string
@@ -10,12 +20,19 @@ export interface User {
   tipo_documento: string
   numero_documento: string
   telefono?: string
+  password?: string
   guarderia_id: string | null
-  guarderia?: {
-    nombre: string
-  }
+  guarderia?: Guarderia
   created_at: string
   updated_at: string
+}
+
+export interface Guarderia {
+  id: string
+  nombre: string
+  direccion: string | null
+  telefono: string | null
+  created_at: string
 }
 
 export interface Aula {
@@ -25,8 +42,10 @@ export interface Aula {
   numero_aula: string
   capacidad: number
   profesor_asignado_id?: string
+  guarderia_id?: string
   created_at: string
   profesor?: User
+  guarderia?: Guarderia
 }
 
 export interface Nino {
@@ -53,6 +72,7 @@ export interface Acudiente {
   email?: string
   direccion?: string
   created_at: string
+  guarderia_id: string
   ninos?: Nino[]
 }
 
@@ -74,6 +94,8 @@ export interface AttendanceRecord {
   nino_id: string
   acudiente_id: string
   usuario_registra_id: string
+  guarderia_id?: string
+  aula_id?: string
   anotacion?: string
   created_at: string
   nino?: Nino
@@ -98,10 +120,14 @@ export interface DaycareConfig {
   updated_at: string
 }
 
-export interface Guarderia {
-  id: string
-  nombre: string
-  direccion: string | null
-  telefono: string | null
-  created_at: string | null
+/**
+ * Tipo especial para respuesta de Supabase:
+ * ninos con su aula anidada como aulas(nombre_aula)
+ */
+export interface NinoConAulaNombre extends Nino {
+  aulas?: {
+    nombre_aula: string
+  }
+  nombreAula?: string
 }
+

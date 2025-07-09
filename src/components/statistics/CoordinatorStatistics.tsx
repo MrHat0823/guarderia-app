@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
 import { Search, Users, School, UserCheck, UserX, Activity, CalendarDays, X } from 'lucide-react'
+import { isHoliday } from 'colombian-holidays'
+
 
 export function CoordinatorStatistics() {
   const { user } = useAuth()
@@ -27,27 +29,43 @@ export function CoordinatorStatistics() {
   }, [user])
 
   const fetchStats = async () => {
-    const today = new Date().toISOString().split('T')[0]
-    const [ninos, acudientes, personal, asistencias] = await Promise.all([
-      supabase.from('ninos').select('*'),
-      supabase.from('acudientes').select('*'),
-      supabase.from('users').select('*').in('rol', ['admin', 'profesor', 'portero']),
-      supabase.from('registros_asistencia').select('*').eq('fecha', today).eq('tipo', 'entrada')
-    ])
+  const today = new Date()
+  const dayOfWeek = today.getDay()
+  const formattedDate = today.toISOString().split('T')[0]
 
-    const asistieronIds = asistencias.data?.map(r => r.nino_id) ?? []
-    const totalNinos = ninos.data?.length ?? 0
-    const asistieronHoy = asistieronIds.length
-    const ausentesHoy = totalNinos - asistieronHoy
-
+  // No mostrar datos si es sábado (6), domingo (0) o festivo en Colombia
+  if (dayOfWeek === 0 || dayOfWeek === 6 || isHoliday(today)) {
     setStats({
-      totalNinos,
-      totalAcudientes: acudientes.data?.length ?? 0,
-      totalPersonal: personal.data?.length ?? 0,
-      asistieronHoy,
-      ausentesHoy
+      totalNinos: 0,
+      totalAcudientes: 0,
+      totalPersonal: 0,
+      asistieronHoy: 0,
+      ausentesHoy: 0
     })
+    return
   }
+
+  const [ninos, acudientes, personal, asistencias] = await Promise.all([
+    supabase.from('ninos').select('*'),
+    supabase.from('acudientes').select('*'),
+    supabase.from('users').select('*').in('rol', ['admin', 'profesor', 'portero']),
+    supabase.from('registros_asistencia').select('*').eq('fecha', formattedDate).eq('tipo', 'entrada')
+  ])
+
+  const asistieronIds = asistencias.data?.map(r => r.nino_id) ?? []
+  const totalNinos = ninos.data?.length ?? 0
+  const asistieronHoy = asistieronIds.length
+  const ausentesHoy = totalNinos - asistieronHoy
+
+  setStats({
+    totalNinos,
+    totalAcudientes: acudientes.data?.length ?? 0,
+    totalPersonal: personal.data?.length ?? 0,
+    asistieronHoy,
+    ausentesHoy
+  })
+}
+
 
   const fetchNinos = async () => {
     const { data, error } = await supabase.from('ninos').select('id, nombres, apellidos, numero_documento')

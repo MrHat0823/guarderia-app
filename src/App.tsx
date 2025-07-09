@@ -15,6 +15,7 @@ import { AttendanceSummary } from './components/attendance/AttendanceSummary'
 import { GuarderiaManagement } from './components/management/GuarderiaManagement'
 import { CoordinatorStatistics } from './components/statistics/CoordinatorStatistics'
 import { CoordinatorDashboard } from './components/dashboard/CoordinatorDashboard'
+import { Toaster } from 'react-hot-toast'
 
 
 function App() {
@@ -86,13 +87,28 @@ function App() {
 
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      <main className="flex-1 overflow-auto">
-        {renderContent()}
-      </main>
-    </div>
-  )
+  <div className="min-h-screen bg-gray-50 flex">
+    <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+    <main className="flex-1 overflow-auto">
+      {renderContent()}
+    </main>
+
+    {/* Añadir esto para que funcionen los toasts globalmente */}
+    <Toaster
+      position="top-right"
+      toastOptions={{
+        duration: 4000,
+        style: {
+          background: '#fff',
+          color: '#333',
+          border: '1px solid #ddd',
+          padding: '12px 16px',
+        },
+      }}
+    />
+  </div>
+)
+
   
 }
 
