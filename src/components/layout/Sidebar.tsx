@@ -43,30 +43,37 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   }
 
   const getMenuItems = () => {
-    const common = [
+  const common = [
+    { id: 'dashboard', label: 'Dashboard', icon: Home },
+    { id: 'qr-scanner', label: 'Escáner QR', icon: QrCode },
+    { id: 'attendance-summary', label: user?.rol === 'coordinador' ? 'Resumen de Asistencias' : 'Registro Personalizado', icon: CalendarSearch },
+    { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
+    { id: 'settings', label: 'Configuración', icon: Settings }
+  ];
+
+  const admin = [
+    { id: 'users', label: 'Usuarios', icon: Users },
+    { id: 'children', label: 'Niños', icon: Baby },
+    { id: 'guardians', label: 'Acudientes', icon: Users },
+    { id: 'classrooms', label: 'Aulas', icon: School },
+    { id: 'registro-terceros', label: 'Registro de Terceros', icon: Baby } // NUEVO
+  ];
+
+  if (user?.rol === 'admin') return [...common, ...admin];
+
+  if (user?.rol === 'coordinador') {
+    return [
       { id: 'dashboard', label: 'Dashboard', icon: Home },
-      { id: 'qr-scanner', label: 'Escáner QR', icon: QrCode },
-      { id: 'attendance-summary', label: user?.rol === 'coordinador' ? 'Resumen de Asistencias' : 'Registro Personalizado', icon: CalendarSearch },
-      { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
-      { id: 'settings', label: 'Configuración', icon: Settings }
-    ]
-    const admin = [
-      { id: 'users', label: 'Usuarios', icon: Users },
-      { id: 'children', label: 'Niños', icon: Baby },
-      { id: 'guardians', label: 'Acudientes', icon: Users },
-      { id: 'classrooms', label: 'Aulas', icon: School }
-    ]
-    if (user?.rol === 'admin') return [...common, ...admin]
-    if (user?.rol === 'coordinador') {
-      return [
-        { id: 'dashboard', label: 'Dashboard', icon: Home },
-        { id: 'coordinator-attendance-summary', label: 'Resumen de Asistencias', icon: CalendarSearch },
-        { id: 'guarderias', label: 'Gestión de Guarderías', icon: School },
-        { id: 'coordinator-statistics', label: 'Estadísticas Coordinador', icon: BarChart3 },
-      ]
-    }
-    return common
+      { id: 'coordinator-attendance-summary', label: 'Resumen de Asistencias', icon: CalendarSearch },
+      { id: 'guarderias', label: 'Gestión de Guarderías', icon: School },
+      { id: 'coordinator-statistics', label: 'Estadísticas Coordinador', icon: BarChart3 },
+    ];
   }
+
+  // Para usuarios NO coordinadores (profesores, etc.), agregamos el nuevo item
+  return [...common, { id: 'registro-terceros', label: 'Registro de Terceros', icon: Baby }];
+};
+
 
   const menuItems = getMenuItems()
 

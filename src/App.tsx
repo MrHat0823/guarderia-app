@@ -19,6 +19,9 @@ import { CoordinatorDashboard } from './components/dashboard/CoordinatorDashboar
 import { CoordinatorAttendanceSummary } from './components/attendance/CoordinatorAttendanceSummary'
 import { SidebarHamburger } from './components/layout/SidebarHamburger'
 import { UsersAttendanceSummary } from './components/attendance/UsersAttendanceSummary'
+import RegistroTerceros from './components/attendance/RegistroTerceros';
+
+
 
 
 
@@ -83,6 +86,10 @@ function App() {
       return <ClassroomManagement />
     case 'settings':
       return <UserSettings />
+      case 'registro-terceros':
+    return user?.rol !== 'coordinador'
+      ? <RegistroTerceros />
+      : <div className="p-6 text-red-600 font-bold">Acceso denegado</div>;
     case 'attendance-summary':
       if (user?.rol === 'coordinador') {
         return <AttendanceSummary />

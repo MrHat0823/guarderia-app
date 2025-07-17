@@ -1,9 +1,9 @@
+// src/components/dashboard/AttendancePDFGenerator.tsx
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { format } from 'date-fns'
-import { Calendar, Download, Loader2 } from 'lucide-react'
+import { Download, Loader2 } from 'lucide-react'
 
 interface Guarderia {
   id: string
@@ -13,24 +13,6 @@ interface Guarderia {
 interface Aula {
   id: string
   nombre_aula: string
-}
-
-interface RegistroAsistencia {
-  fecha: string
-  hora: string
-  tipo: string
-  nino: {
-    nombres: string
-    apellidos: string
-    tipo_documento: string
-    numero_documento: string
-  }
-  acudiente: {
-    nombres: string
-    apellidos: string
-    tipo_documento: string
-    numero_documento: string
-  }
 }
 
 export default function AttendancePDFGenerator() {
@@ -54,47 +36,50 @@ export default function AttendancePDFGenerator() {
     const { data, error } = await supabase
       .from('guarderias')
       .select('id, nombre')
-    if (!error) setGuarderias(data)
+    if (!error && data) setGuarderias(data)
   }
 
   const fetchAulas = async () => {
-
     const { data, error } = await supabase
       .from('aulas')
       .select('id, nombre_aula')
       .eq('guarderia_id', selectedGuarderia)
-    if (!error) setAulas(data)
-        }
+    if (!error && data) setAulas(data)
+  }
 
-        const generarPDF = async () => {
-          if (!selectedGuarderia || !fromDate || !toDate) return
-          setLoading(true)
+  const generarPDF = async () => {
+    if (!selectedGuarderia || !fromDate || !toDate) return
+    setLoading(true)
 
-          try {
-          let query = supabase
+    try {
+      let query = supabase
         .from('registros_asistencia')
         .select(`
-            fecha,
-            hora,
-            tipo,
-            aula_id,
-            aulas (
-              nombre_aula
-            ),
-            ninos (
-              nombres,
-              apellidos,
-              tipo_documento,
-              numero_documento
-            ),
-            acudientes (
-              nombres,
-              apellidos,
-              tipo_documento,
-              numero_documento
-            )
-          `)
-
+          fecha,
+          hora,
+          tipo,
+          aulas (
+            nombre_aula
+          ),
+          ninos (
+            nombres,
+            apellidos,
+            tipo_documento,
+            numero_documento
+          ),
+          acudientes (
+            nombres,
+            apellidos,
+            tipo_documento,
+            numero_documento
+          ),
+          terceros (
+            nombres,
+            apellidos,
+            tipo_documento,
+            numero_documento
+          )
+        `)
         .gte('fecha', fromDate)
         .lte('fecha', toDate)
         .eq('guarderia_id', selectedGuarderia)
@@ -106,60 +91,64 @@ export default function AttendancePDFGenerator() {
       const { data: registrosRaw, error } = await query
 
       if (error) throw error
-      const registros = registrosRaw
+      if (!registrosRaw) return
 
-     const registrosAgrupados = agruparRegistros(registros)
+      const registrosAgrupados = agruparRegistros(registrosRaw)
 
+      const guarderiaNombre =
+        guarderias.find((g) => g.id === selectedGuarderia)?.nombre || 'Guardería'
+      const aulaNombre =
+        aulas.find((a) => a.id === selectedAula)?.nombre_aula || ''
 
-      const guarderiaNombre = guarderias.find(g => g.id === selectedGuarderia)?.nombre || 'Guardería'
-      const aulaNombre = aulas.find(a => a.id === selectedAula)?.nombre_aula || ''
-
-      const titulo = `Control de Asistencias de la Guardería ${guarderiaNombre}${aulaNombre ? ' - Aula ' + aulaNombre : ''}`
+      const titulo = `Control de Asistencias de la Guardería ${guarderiaNombre}${
+        aulaNombre ? ' - Aula ' + aulaNombre : ''
+      }`
 
       const doc = new jsPDF({ orientation: 'landscape' })
-
       doc.setFontSize(16)
       doc.text(titulo, 14, 20)
 
-
       autoTable(doc, {
-  startY: 30,
-  head: [[
-    'Niño',
-    'Tipo Documento',
-    'Número de Docuemnto',
-    'Acudiente',
-    'Tipo Documento Acudiente',
-    'Número de Documento Acudiente',
-    'Fecha',
-    'Hora Entrada',
-    'Hora Salida',
-    ...(selectedAula ? [] : ['Aula']) //  Solo si no se seleccionó aula
-  ]],
-  body: registrosAgrupados.map(r => [
-    `${r.nino.nombres} ${r.nino.apellidos}`,
-    r.nino.tipo_documento,
-    r.nino.numero_documento,
-    `${r.acudiente.nombres} ${r.acudiente.apellidos}`,
-    r.acudiente.tipo_documento,
-    r.acudiente.numero_documento,
-    r.fecha,
-    r.hora_entrada || '',
-    r.hora_salida || '',
-    ...(selectedAula ? [] : [r.aula || '']) // 👈 Solo si no se seleccionó aula
-  ]),
-  theme: 'striped',
-  styles: {
-    fontSize: 10,
-    halign: 'center'
-  },
-  headStyles: {
-    fillColor: [99, 179, 237]
-  }
-})
+        startY: 30,
+        head: [
+          [
+            'Niño',
+            'Tipo Documento',
+            'Número de Documento',
+            'Acudiente/Tercero',
+            'Tipo Documento Acudiente/Tercero',
+            'Número de Documento Acudiente/Tercero',
+            'Fecha',
+            'Hora Entrada',
+            'Hora Salida',
+            ...(selectedAula ? [] : ['Aula'])
+          ]
+        ],
+        body: registrosAgrupados.map((r) => [
+          `${r.nino.nombres} ${r.nino.apellidos}`,
+          r.nino.tipo_documento,
+          r.nino.numero_documento,
+          `${r.acudiente?.nombres || ''} ${r.acudiente?.apellidos || ''}`,
+          r.acudiente?.tipo_documento || '',
+          r.acudiente?.numero_documento || '',
+          r.fecha,
+          r.hora_entrada || '',
+          r.hora_salida || '',
+          ...(selectedAula ? [] : [r.aula || ''])
+        ]),
+        theme: 'striped',
+        styles: {
+          fontSize: 10,
+          halign: 'center'
+        },
+        headStyles: {
+          fillColor: [99, 179, 237]
+        }
+      })
 
-
-      doc.save(`asistencias_${guarderiaNombre}_${fromDate}_to_${toDate}.pdf`)
+      doc.save(
+        `asistencias_${guarderiaNombre}_${fromDate}_to_${toDate}.pdf`
+      )
     } catch (err) {
       console.error('Error al generar PDF:', err)
     } finally {
@@ -168,37 +157,38 @@ export default function AttendancePDFGenerator() {
   }
 
   const agruparRegistros = (registros: any[]): {
-  nino: any
-  acudiente: any
-  fecha: string
-  hora_entrada?: string
-  hora_salida?: string
-  aula?: string
-}[] => {
-  const mapa = new Map<string, any>()
+    nino: any
+    acudiente: any
+    fecha: string
+    hora_entrada?: string
+    hora_salida?: string
+    aula?: string
+  }[] => {
+    const mapa = new Map<string, any>()
 
-  registros.forEach(r => {
-    const clave = `${r.ninos.numero_documento}_${r.fecha}`
+    registros.forEach((r) => {
+      const clave = `${r.ninos.numero_documento}_${r.fecha}`
 
-    if (!mapa.has(clave)) {
-      mapa.set(clave, {
-        nino: r.ninos,
-        acudiente: r.acudientes,
-        fecha: r.fecha,
-        hora_entrada: r.tipo === 'entrada' ? r.hora : undefined,
-        hora_salida: r.tipo === 'salida' ? r.hora : undefined,
-        aula: r.aulas?.nombre_aula || ''
-      })
-    } else {
-      const existente = mapa.get(clave)
-      if (r.tipo === 'entrada') existente.hora_entrada = r.hora
-      if (r.tipo === 'salida') existente.hora_salida = r.hora
-    }
-  })
+      const acudienteOTercero = r.terceros ?? r.acudientes
 
-  return Array.from(mapa.values())
-}
+      if (!mapa.has(clave)) {
+        mapa.set(clave, {
+          nino: r.ninos,
+          acudiente: acudienteOTercero,
+          fecha: r.fecha,
+          hora_entrada: r.tipo === 'entrada' ? r.hora : undefined,
+          hora_salida: r.tipo === 'salida' ? r.hora : undefined,
+          aula: r.aulas?.nombre_aula || ''
+        })
+      } else {
+        const existente = mapa.get(clave)
+        if (r.tipo === 'entrada') existente.hora_entrada = r.hora
+        if (r.tipo === 'salida') existente.hora_salida = r.hora
+      }
+    })
 
+    return Array.from(mapa.values())
+  }
 
   return (
     <div className="bg-white shadow rounded-lg p-6 max-w-3xl mx-auto mt-6">
@@ -209,51 +199,63 @@ export default function AttendancePDFGenerator() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Guardería</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Guardería
+          </label>
           <select
             className="w-full border-gray-300 rounded-md"
             value={selectedGuarderia}
-            onChange={e => setSelectedGuarderia(e.target.value)}
+            onChange={(e) => setSelectedGuarderia(e.target.value)}
           >
             <option value="">Selecciona una guardería</option>
-            {guarderias.map(g => (
-              <option key={g.id} value={g.id}>{g.nombre}</option>
+            {guarderias.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.nombre}
+              </option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Aula (opcional)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Aula (opcional)
+          </label>
           <select
             className="w-full border-gray-300 rounded-md"
             value={selectedAula}
-            onChange={e => setSelectedAula(e.target.value)}
+            onChange={(e) => setSelectedAula(e.target.value)}
             disabled={!aulas.length}
           >
             <option value="">Todas las aulas</option>
-            {aulas.map(a => (
-              <option key={a.id} value={a.id}>{a.nombre_aula}</option>
+            {aulas.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nombre_aula}
+              </option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Desde</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Desde
+          </label>
           <input
             type="date"
             className="w-full border-gray-300 rounded-md"
             value={fromDate}
-            onChange={e => setFromDate(e.target.value)}
+            onChange={(e) => setFromDate(e.target.value)}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Hasta
+          </label>
           <input
             type="date"
             className="w-full border-gray-300 rounded-md"
             value={toDate}
-            onChange={e => setToDate(e.target.value)}
+            onChange={(e) => setToDate(e.target.value)}
           />
         </div>
       </div>
@@ -263,7 +265,11 @@ export default function AttendancePDFGenerator() {
         disabled={loading || !selectedGuarderia || !fromDate || !toDate}
         className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
       >
-        {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <Download className="w-5 h-5" />}
+        {loading ? (
+          <Loader2 className="animate-spin w-5 h-5" />
+        ) : (
+          <Download className="w-5 h-5" />
+        )}
         Generar PDF
       </button>
     </div>
