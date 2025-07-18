@@ -20,6 +20,8 @@ import { CoordinatorAttendanceSummary } from './components/attendance/Coordinato
 import { SidebarHamburger } from './components/layout/SidebarHamburger'
 import { UsersAttendanceSummary } from './components/attendance/UsersAttendanceSummary'
 import RegistroTerceros from './components/attendance/RegistroTerceros';
+import { TercerosList } from './components/management/TercerosList';
+
 
 
 
@@ -76,6 +78,11 @@ function App() {
       return user?.rol === 'coordinador'
         ? <CoordinatorAttendanceSummary />
         : <div className="p-6 text-red-600 font-bold">Acceso denegado</div>
+        case 'terceros-list':
+          return user?.rol === 'coordinador'
+            ? <TercerosList />
+            : <div className="p-6 text-red-600 font-bold">Acceso denegado</div>;
+
     case 'users':
       return <UserManagement />
     case 'children':

@@ -1,3 +1,5 @@
+// src/lib/types/index.ts
+
 export type UserRole = 'coordinador' | 'admin' | 'profesor' | 'portero'
 export type AttendanceType = 'entrada' | 'salida'
 export type TipoParentesco =
@@ -86,13 +88,32 @@ export interface NinoAcudiente {
   acudiente?: Acudiente
 }
 
+/** ✅ NUEVO: Representa a los terceros */
+export interface Tercero {
+  id: string
+  nombres: string
+  apellidos: string
+  tipo_documento: string
+  numero_documento: string
+  telefono?: string
+  email?: string
+  direccion?: string
+  parentesco?: string
+  foto_id_frente?: string
+  foto_id_reverso?: string
+  guarderia_id: string
+  aula_id?: string
+  created_at: string
+}
+
 export interface AttendanceRecord {
   id: string
   fecha: string
   hora: string
   tipo: AttendanceType
   nino_id: string
-  acudiente_id: string
+  acudiente_id?: string
+  tercero_id?: string            // NUEVO
   usuario_registra_id: string
   guarderia_id?: string
   aula_id?: string
@@ -100,6 +121,7 @@ export interface AttendanceRecord {
   created_at: string
   nino?: Nino
   acudiente?: Acudiente
+  tercero?: Tercero              // NUEVO
   usuario_registra?: User
 }
 
@@ -120,14 +142,10 @@ export interface DaycareConfig {
   updated_at: string
 }
 
-/**
- * Tipo especial para respuesta de Supabase:
- * ninos con su aula anidada como aulas(nombre_aula)
- */
+/** Tipo especial para respuesta de Supabase */
 export interface NinoConAulaNombre extends Nino {
   aulas?: {
     nombre_aula: string
   }
   nombreAula?: string
 }
-

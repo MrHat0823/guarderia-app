@@ -11,6 +11,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 
+
 interface Nino {
   id: string;
   nombres: string;
@@ -52,14 +53,11 @@ export default function RegistroTerceros() {
     foto_reverso: "",
   });
 
-  // ✅ Buscar coincidencias mientras escribe
+  const fechaLocal = new Date().toLocaleDateString("en-CA");
+
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
-      if (search.trim().length < 2) {
-        setNinos([]);
-        return;
-      }
-      if (!user?.guarderia_id) {
+      if (search.trim().length < 2 || !user?.guarderia_id) {
         setNinos([]);
         return;
       }
@@ -75,7 +73,6 @@ export default function RegistroTerceros() {
         .limit(10);
 
       if (error) {
-        console.error("❌ Error buscando niños:", error);
         toast.error("Error buscando niños");
       } else {
         setNinos(data || []);
@@ -86,7 +83,6 @@ export default function RegistroTerceros() {
     return () => clearTimeout(delayDebounce);
   }, [search, user?.guarderia_id]);
 
-  // ✅ Seleccionar niño
   const seleccionarNino = async (n: Nino) => {
     setSearch(`${n.nombres} ${n.apellidos}`);
     setNinos([]);
@@ -107,8 +103,7 @@ export default function RegistroTerceros() {
 
     setLoading(false);
 
-    if (error) {
-      console.error("❌ Error cargando niño:", error);
+    if (error || !data) {
       toast.error("Error cargando datos del niño");
       return;
     }
@@ -123,28 +118,27 @@ export default function RegistroTerceros() {
       guarderia_id: data.guarderia_id,
     });
 
-    const acudientesNormalizados = (data.nino_acudiente || []).map((rel: any) => ({
-      id: rel.acudientes.id,
-      nombres: rel.acudientes.nombres,
-      apellidos: rel.acudientes.apellidos,
-      numero_documento: rel.acudientes.numero_documento,
-      parentesco: rel.parentesco,
-    }));
-
-    setAcudientes(acudientesNormalizados);
+    setAcudientes(
+      (data.nino_acudiente || []).map((rel: any) => ({
+        id: rel.acudientes.id,
+        nombres: rel.acudientes.nombres,
+        apellidos: rel.acudientes.apellidos,
+        numero_documento: rel.acudientes.numero_documento,
+        parentesco: rel.parentesco,
+      }))
+    );
 
     const { data: registro } = await supabase
       .from("registros_asistencia")
       .select("tipo")
       .eq("nino_id", n.id)
-      .eq("fecha", new Date().toISOString().split("T")[0])
+      .eq("fecha", fechaLocal)
       .order("created_at", { ascending: false })
       .limit(1);
 
     setRegistroHoy(registro?.length ? registro[0].tipo : null);
   };
 
-  // ✅ Subir imagen
   const uploadImage = async (file: File, path: "frenteId" | "reversoId") => {
     const fileName = `${uuidv4()}-${file.name}`;
     const { error } = await supabase.storage
@@ -152,7 +146,6 @@ export default function RegistroTerceros() {
       .upload(`${path}/${fileName}`, file);
 
     if (error) {
-      console.error("Error subiendo imagen", error);
       toast.error("Error subiendo la imagen");
       return "";
     }
@@ -162,7 +155,6 @@ export default function RegistroTerceros() {
       .getPublicUrl(`${path}/${fileName}`).data.publicUrl;
   };
 
-  // ✅ Registrar asistencia con limpieza de campos
   const registrarAsistencia = async (tipo: "entrada" | "salida") => {
     if (!user) return toast.error("Debe iniciar sesión");
     if (!nino) return toast.error("Seleccione un niño primero");
@@ -192,7 +184,6 @@ export default function RegistroTerceros() {
       .single();
 
     if (terceroError) {
-      console.error("❌ Error registrando tercero:", terceroError);
       toast.error(`Error registrando tercero`);
       setSaving(false);
       return;
@@ -205,7 +196,7 @@ export default function RegistroTerceros() {
         nino_id: nino.id,
         tercero_id: terceroData.id,
         usuario_registra_id: user.id,
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: fechaLocal,
         guarderia_id: user.guarderia_id,
         aula_id: nino.aula_id,
       }]);
@@ -213,14 +204,12 @@ export default function RegistroTerceros() {
     setSaving(false);
 
     if (asistenciaError) {
-      console.error(asistenciaError);
       toast.error("Error registrando asistencia");
       return;
     }
 
     toast.success(`✅ Registro de ${tipo.toUpperCase()} exitoso`);
 
-    // 🔥 Limpiar campos tras registro exitoso
     setTercero({
       nombres: "",
       apellidos: "",
@@ -236,161 +225,179 @@ export default function RegistroTerceros() {
     setRegistroHoy(tipo);
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-mint-50 via-sky-50 to-blue-50 p-6">
-      <div className="max-w-3xl mx-auto bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2 mb-6">
-          <Baby className="w-6 h-6 text-mint-600" />
-          Registro de Terceros
-        </h2>
+  return  (
+  <div className="min-h-screen bg-gradient-to-br from-mint-50 via-sky-50 to-blue-50 p-6">
+    <div className="max-w-3xl mx-auto bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-gray-100 p-6">
+      <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2 mb-6">
+        <Baby className="w-6 h-6 text-mint-600" />
+        Registro de Terceros
+      </h2>
 
-        {/* Buscar niño */}
-        <div className="relative mb-6">
-          <div className="flex items-center bg-gray-50 border rounded-lg px-3">
-            <Search className="w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar niño por nombre o documento"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="bg-transparent w-full p-2 focus:outline-none"
-            />
-          </div>
-          {loading && (
-            <p className="text-sm text-gray-500 mt-1">Buscando...</p>
-          )}
-          {search.trim() && ninos.length > 0 && (
-            <ul className="absolute w-full bg-white border rounded-lg shadow-md mt-1 max-h-48 overflow-auto z-10">
-              {ninos.map((n) => (
-                <li
-                  key={n.id}
-                  onClick={() => seleccionarNino(n)}
-                  className="px-3 py-2 hover:bg-mint-50 cursor-pointer"
-                >
-                  {n.nombres} {n.apellidos} - {n.numero_documento}
-                </li>
-              ))}
-            </ul>
-          )}
+      {/* Buscar niño */}
+      <div className="relative mb-6">
+        <div className="flex items-center bg-gray-50 border rounded-lg px-3">
+          <Search className="w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar niño por nombre o documento"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-transparent w-full p-2 focus:outline-none"
+          />
         </div>
-
-        {nino && (
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200 mb-6">
-            <h3 className="font-bold text-lg text-gray-800">
-              {nino.nombres} {nino.apellidos}
-            </h3>
-            <p className="text-gray-700">Documento: {nino.numero_documento}</p>
-            {nino.aula_nombre && <p>Aula: {nino.aula_nombre}</p>}
-            <p className="mt-2 font-semibold text-gray-800">Acudientes:</p>
-            <ul className="list-disc list-inside text-gray-700">
-              {acudientes.map((a) => (
-                <li key={a.id}>
-                  {a.nombres} {a.apellidos} ({a.parentesco})
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {nino && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-lg border p-4 shadow-sm">
-            <h3 className="font-semibold mb-4 text-gray-800">Datos del Tercero</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {([
-  ["Nombres", "nombres"],
-  ["Apellidos", "apellidos"],
-  ["Número Documento", "numero_documento"],
-  ["Teléfono", "telefono"],
-  ["Email", "email"],
-  ["Dirección", "direccion"],
-  ["Parentesco", "parentesco"],
-] as [string, keyof typeof tercero][]).map(([placeholder, key]) => (
-  <input
-    key={key}
-    placeholder={placeholder}
-    className="border rounded-lg p-2 focus:ring-2 focus:ring-mint-300"
-    value={tercero[key]}
-    onChange={(e) =>
-      setTercero({ ...tercero, [key]: e.target.value })
-    }
-  />
-))}
-
-              <select
-                className="border rounded-lg p-2 focus:ring-2 focus:ring-mint-300"
-                value={tercero.tipo_documento}
-                onChange={(e) =>
-                  setTercero({ ...tercero, tipo_documento: e.target.value })
-                }
+        {loading && <p className="text-sm text-gray-500 mt-1">Buscando...</p>}
+        {search.trim() && ninos.length > 0 && (
+          <ul className="absolute w-full bg-white border rounded-lg shadow-md mt-1 max-h-48 overflow-auto z-10">
+            {ninos.map((n) => (
+              <li
+                key={n.id}
+                onClick={() => seleccionarNino(n)}
+                className="px-3 py-2 hover:bg-mint-50 cursor-pointer"
               >
-                <option value="CC">CC</option>
-                <option value="TI">TI</option>
-                <option value="CE">CE</option>
-              </select>
-            </div>
-
-            {/* Subida imágenes */}
-            <div className="mt-3 flex gap-3">
-              <label className="cursor-pointer flex items-center gap-2 bg-mint-50 border border-mint-200 rounded-lg px-3 py-2 hover:bg-mint-100 transition">
-                <UploadCloud className="w-5 h-5 text-mint-600" />
-                Frente
-                <input
-                  type="file"
-                  className="hidden"
-                  onChange={async (e) => {
-                    if (e.target.files?.[0]) {
-                      const url = await uploadImage(e.target.files[0], "frenteId");
-                      setTercero({ ...tercero, foto_frente: url });
-                    }
-                  }}
-                />
-              </label>
-              <label className="cursor-pointer flex items-center gap-2 bg-mint-50 border border-mint-200 rounded-lg px-3 py-2 hover:bg-mint-100 transition">
-                <UploadCloud className="w-5 h-5 text-mint-600" />
-                Reverso
-                <input
-                  type="file"
-                  className="hidden"
-                  onChange={async (e) => {
-                    if (e.target.files?.[0]) {
-                      const url = await uploadImage(e.target.files[0], "reversoId");
-                      setTercero({ ...tercero, foto_reverso: url });
-                    }
-                  }}
-                />
-              </label>
-            </div>
-
-            {/* Botones */}
-            <div className="mt-4 flex gap-3">
-              {!registroHoy && (
-                <button
-                  disabled={saving}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white bg-green-500 hover:bg-green-600 transition ${
-                    saving ? "opacity-70 cursor-not-allowed" : ""
-                  }`}
-                  onClick={() => registrarAsistencia("entrada")}
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  Registrar ENTRADA
-                </button>
-              )}
-              {registroHoy === "entrada" && (
-                <button
-                  disabled={saving}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white bg-red-500 hover:bg-red-600 transition ${
-                    saving ? "opacity-70 cursor-not-allowed" : ""
-                  }`}
-                  onClick={() => registrarAsistencia("salida")}
-                >
-                  <XCircle className="w-5 h-5" />
-                  Registrar SALIDA
-                </button>
-              )}
-            </div>
-          </div>
+                {n.nombres} {n.apellidos} - {n.numero_documento}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
+
+      {nino && (
+        <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200 mb-6">
+          <h3 className="font-bold text-lg text-gray-800">
+            {nino.nombres} {nino.apellidos}
+          </h3>
+          <p className="text-gray-700">Documento: {nino.numero_documento}</p>
+          {nino.aula_nombre && <p>Aula: {nino.aula_nombre}</p>}
+          <p className="mt-2 font-semibold text-gray-800">Acudientes:</p>
+          <ul className="list-disc list-inside text-gray-700">
+            {acudientes.map((a) => (
+              <li key={a.id}>
+                {a.nombres} {a.apellidos} ({a.parentesco})
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {nino && (
+        <div className="bg-white/80 backdrop-blur-sm rounded-lg border p-4 shadow-sm">
+          <h3 className="font-semibold mb-4 text-gray-800">Datos del Tercero</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {(
+              [
+                ["Nombres", "nombres"],
+                ["Apellidos", "apellidos"],
+                ["Número Documento", "numero_documento"],
+                ["Teléfono", "telefono"],
+                ["Email", "email"],
+                ["Dirección", "direccion"],
+                ["Parentesco", "parentesco"],
+              ] as [string, keyof typeof tercero][]
+            ).map(([placeholder, key]) => {
+              // Ajustamos el tipo de input según el campo
+              let extraProps: any = {};
+              if (key === "telefono") {
+                extraProps = {
+                  type: "tel",
+                  inputMode: "numeric",
+                  pattern: "[0-9]*",
+                };
+              }
+              if (key === "email") {
+                extraProps = { type: "email" };
+              }
+              return (
+                <input
+                  key={key}
+                  placeholder={placeholder}
+                  className="border rounded-lg p-2 focus:ring-2 focus:ring-mint-300"
+                  value={tercero[key]}
+                  onChange={(e) =>
+                    setTercero({ ...tercero, [key]: e.target.value })
+                  }
+                  {...extraProps}
+                />
+              );
+            })}
+
+            <select
+              className="border rounded-lg p-2 focus:ring-2 focus:ring-mint-300"
+              value={tercero.tipo_documento}
+              onChange={(e) =>
+                setTercero({ ...tercero, tipo_documento: e.target.value })
+              }
+            >
+              <option value="CC">CC</option>
+              <option value="TI">TI</option>
+              <option value="CE">CE</option>
+            </select>
+          </div>
+
+          {/* Subida imágenes */}
+          <p className="mt-4 text-gray-700 font-medium">
+            Foto del documento de identidad por ambos lados
+          </p>
+          <div className="mt-2 flex gap-3">
+            <label className="cursor-pointer flex items-center gap-2 bg-mint-50 border border-mint-200 rounded-lg px-3 py-2 hover:bg-mint-100 transition">
+              <UploadCloud className="w-5 h-5 text-mint-600" />
+              Frente
+              <input
+                type="file"
+                className="hidden"
+                onChange={async (e) => {
+                  if (e.target.files?.[0]) {
+                    const url = await uploadImage(e.target.files[0], "frenteId");
+                    setTercero({ ...tercero, foto_frente: url });
+                  }
+                }}
+              />
+            </label>
+            <label className="cursor-pointer flex items-center gap-2 bg-mint-50 border border-mint-200 rounded-lg px-3 py-2 hover:bg-mint-100 transition">
+              <UploadCloud className="w-5 h-5 text-mint-600" />
+              Reverso
+              <input
+                type="file"
+                className="hidden"
+                onChange={async (e) => {
+                  if (e.target.files?.[0]) {
+                    const url = await uploadImage(e.target.files[0], "reversoId");
+                    setTercero({ ...tercero, foto_reverso: url });
+                  }
+                }}
+              />
+            </label>
+          </div>
+
+          {/* Botones */}
+          <div className="mt-4 flex gap-3">
+            {!registroHoy && (
+              <button
+                disabled={saving}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white bg-green-500 hover:bg-green-600 transition ${
+                  saving ? "opacity-70 cursor-not-allowed" : ""
+                }`}
+                onClick={() => registrarAsistencia("entrada")}
+              >
+                <CheckCircle className="w-5 h-5" />
+                Registrar ENTRADA
+              </button>
+            )}
+            {registroHoy === "entrada" && (
+              <button
+                disabled={saving}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white bg-red-500 hover:bg-red-600 transition ${
+                  saving ? "opacity-70 cursor-not-allowed" : ""
+                }`}
+                onClick={() => registrarAsistencia("salida")}
+              >
+                <XCircle className="w-5 h-5" />
+                Registrar SALIDA
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
-  );
+  </div>
+);
 }

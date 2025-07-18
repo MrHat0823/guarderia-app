@@ -1,12 +1,10 @@
-// project\src\components\layout\Sidebar.tsx
 import React, { useState, useEffect } from 'react'
 import {
   Home, Users, Baby, School, QrCode, BarChart3,
-  LogOut, Settings, CalendarSearch, Menu
+  LogOut, Settings, CalendarSearch, NotebookPen
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useDaycareConfig } from '../../hooks/useDaycareConfig'
-
 
 interface SidebarProps {
   activeTab: string
@@ -21,10 +19,10 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const appVersion = import.meta.env.VITE_APP_VERSION
 
   useEffect(() => {
-        const handleOpen = () => setIsMobileOpen(true)
-        window.addEventListener('open-sidebar', handleOpen)
-        return () => window.removeEventListener('open-sidebar', handleOpen)
-      }, [])
+    const handleOpen = () => setIsMobileOpen(true)
+    window.addEventListener('open-sidebar', handleOpen)
+    return () => window.removeEventListener('open-sidebar', handleOpen)
+  }, [])
 
   const handleSignOut = async () => {
     if (isLoggingOut) return
@@ -43,37 +41,38 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   }
 
   const getMenuItems = () => {
-  const common = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'qr-scanner', label: 'Escáner QR', icon: QrCode },
-    { id: 'attendance-summary', label: user?.rol === 'coordinador' ? 'Resumen de Asistencias' : 'Registro Personalizado', icon: CalendarSearch },
-    { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
-    { id: 'settings', label: 'Configuración', icon: Settings }
-  ];
-
-  const admin = [
-    { id: 'users', label: 'Usuarios', icon: Users },
-    { id: 'children', label: 'Niños', icon: Baby },
-    { id: 'guardians', label: 'Acudientes', icon: Users },
-    { id: 'classrooms', label: 'Aulas', icon: School },
-    { id: 'registro-terceros', label: 'Registro de Terceros', icon: Baby } // NUEVO
-  ];
-
-  if (user?.rol === 'admin') return [...common, ...admin];
-
-  if (user?.rol === 'coordinador') {
-    return [
+    const common = [
       { id: 'dashboard', label: 'Dashboard', icon: Home },
-      { id: 'coordinator-attendance-summary', label: 'Resumen de Asistencias', icon: CalendarSearch },
-      { id: 'guarderias', label: 'Gestión de Guarderías', icon: School },
-      { id: 'coordinator-statistics', label: 'Estadísticas Coordinador', icon: BarChart3 },
-    ];
+      { id: 'qr-scanner', label: 'Escáner QR', icon: QrCode },
+      { id: 'attendance-summary', label: user?.rol === 'coordinador' ? 'Resumen de Asistencias' : 'Registro Personalizado', icon: CalendarSearch },
+      { id: 'statistics', label: 'Estadísticas', icon: BarChart3 },
+      { id: 'settings', label: 'Configuración', icon: Settings }
+    ]
+
+    const admin = [
+      { id: 'users', label: 'Usuarios', icon: Users },
+      { id: 'children', label: 'Niños', icon: Baby },
+      { id: 'guardians', label: 'Acudientes', icon: Users },
+      { id: 'classrooms', label: 'Aulas', icon: School },
+      { id: 'registro-terceros', label: 'Registro de Terceros', icon: NotebookPen }
+    ]
+
+    if (user?.rol === 'admin') return [...common, ...admin]
+
+    if (user?.rol === 'coordinador') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: Home },
+        { id: 'coordinator-attendance-summary', label: 'Resumen de Asistencias', icon: CalendarSearch },
+        { id: 'guarderias', label: 'Gestión de Guarderías', icon: School },
+        { id: 'coordinator-statistics', label: 'Estadísticas Coordinador', icon: BarChart3 },
+        // ✅ Nuevo menú exclusivo para coordinador
+        { id: 'terceros-list', label: 'Listado de Terceros', icon: Users }
+      ]
+    }
+
+    // Para profesores y otros roles
+    return [...common, { id: 'registro-terceros', label: 'Registro de Terceros', icon: Baby }]
   }
-
-  // Para usuarios NO coordinadores (profesores, etc.), agregamos el nuevo item
-  return [...common, { id: 'registro-terceros', label: 'Registro de Terceros', icon: Baby }];
-};
-
 
   const menuItems = getMenuItems()
 
@@ -81,8 +80,6 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   return (
     <>
-      
-      {/* Overlay en móviles */}
       {isMobileOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-30 z-40 md:hidden"
@@ -90,7 +87,6 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         />
       )}
 
-      {/* Sidebar */}
       <div
         className={`
           fixed md:relative z-50 md:z-auto top-0 left-0 h-full bg-white shadow-lg flex flex-col transition-transform duration-300
@@ -168,4 +164,3 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     </>
   )
 }
-

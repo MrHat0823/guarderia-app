@@ -92,7 +92,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 }, [user?.guarderia_id])
 
 
-  const loadStats = async (isInitial = false) => {
+const loadStats = async (isInitial = false) => {
   if (isInitial) {
     setInitialLoading(true)
   } else {
@@ -100,41 +100,28 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }
 
   try {
-    console.log('Dashboard - Iniciando carga de estadísticas')
-
-    // Prueba de conexión
-    const { error: connectionError } = await supabase
-      .from('users')
-      .select('id', { head: true })
-
-    if (connectionError) {
-      throw new Error(`Error de conexión a la base de datos: ${connectionError.message}`)
-    }
-
     const now = new Date()
     const today = format(now, 'yyyy-MM-dd')
 
-    // Total de niños en esta guardería
     const { count: totalNinos } = await supabase
       .from('ninos')
       .select('*', { count: 'exact', head: true })
       .eq('guarderia_id', user?.guarderia_id)
 
-    // Niños activos en esta guardería
     const { count: ninosActivos } = await supabase
       .from('ninos')
       .select('*', { count: 'exact', head: true })
       .eq('activo', true)
       .eq('guarderia_id', user?.guarderia_id)
 
-    // Asistencia de hoy en esta guardería
+    // SOLO ENTRADAS
     const { count: asistenciaHoy } = await supabase
       .from('registros_asistencia')
       .select('*', { count: 'exact', head: true })
       .eq('fecha', today)
+      .eq('tipo', 'entrada')
       .eq('guarderia_id', user?.guarderia_id)
 
-    // Entradas de hoy
     const { count: totalEntradas } = await supabase
       .from('registros_asistencia')
       .select('*', { count: 'exact', head: true })
@@ -142,7 +129,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       .eq('tipo', 'entrada')
       .eq('guarderia_id', user?.guarderia_id)
 
-    // Salidas de hoy
     const { count: totalSalidas } = await supabase
       .from('registros_asistencia')
       .select('*', { count: 'exact', head: true })
@@ -150,18 +136,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       .eq('tipo', 'salida')
       .eq('guarderia_id', user?.guarderia_id)
 
-    // Actualizar estado
     setStats({
       totalNinos: totalNinos ?? 0,
       ninosActivos: ninosActivos ?? 0,
-      asistenciaHoy: asistenciaHoy ?? 0,
+      asistenciaHoy: asistenciaHoy ?? 0, // ✅ corregido
       totalEntradas: totalEntradas ?? 0,
       totalSalidas: totalSalidas ?? 0
     })
-
   } catch (error) {
     console.error('Dashboard - Error general en loadStats:', error)
-
     setStats({
       totalNinos: 0,
       ninosActivos: 0,
@@ -169,11 +152,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       totalEntradas: 0,
       totalSalidas: 0
     })
-
-    if (error instanceof Error && error.message.includes('Failed to fetch')) {
-      console.error('Dashboard - Error de conectividad. Verifique su conexión a internet y la configuración de Supabase.')
-    }
-
   } finally {
     if (isInitial) {
       setInitialLoading(false)
@@ -184,30 +162,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 }
 
 
-  const loadChildrenInFacility = async () => {
+
+const loadChildrenInFacility = async () => {
   try {
-    const now = new Date()
-    const today = format(now, 'yyyy-MM-dd')
+    const today = format(new Date(), "yyyy-MM-dd");
 
-    console.log('Dashboard - Cargando niños en plantel para fecha:', today)
-
-    // Obtener últimas fechas de asistencia en esta guardería
-    const { data: allDates, error: datesError } = await supabase
-      .from('registros_asistencia')
-      .select('fecha')
-      .eq('guarderia_id', user?.guarderia_id)
-      .order('fecha', { ascending: false })
-      .limit(10)
-
-    if (datesError) {
-      throw new Error(`Error al obtener fechas: ${datesError.message}`)
-    }
-
-    console.log('Dashboard - Últimas 10 fechas en BD:', allDates?.map(d => d.fecha) || [])
-
-    // Obtener registros de hoy en esta guardería
     const { data: todayRecords, error: recordsError } = await supabase
-      .from('registros_asistencia')
+      .from("registros_asistencia")
       .select(`
         nino_id,
         tipo,
@@ -216,87 +177,97 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           nombres,
           apellidos
         ),
+        terceros (
+          nombres,
+          apellidos
+        ),
         ninos (
           id,
           nombres,
           apellidos,
           numero_documento,
-          guarderia_id,
           aulas (
             nombre_aula,
             nivel_educativo
           )
         )
       `)
-      .eq('fecha', today)
-      .eq('guarderia_id', user?.guarderia_id)
-      .order('hora', { ascending: true })
+      .eq("fecha", today)
+      .eq("guarderia_id", user?.guarderia_id)
+      .order("hora", { ascending: true });
 
     if (recordsError) {
-      throw new Error(`Error al obtener registros: ${recordsError.message}`)
+      throw new Error(`Error al obtener registros: ${recordsError.message}`);
     }
 
     if (!todayRecords || todayRecords.length === 0) {
-      console.log('Dashboard - No hay registros para hoy')
-      setChildrenInFacility([])
-      return
+      setChildrenInFacility([]);
+      return;
     }
 
-    const childrenStatus = new Map<string, {
-      child: any,
-      lastRecord: any,
-      isInFacility: boolean
-    }>()
+    const childrenStatus = new Map<
+      string,
+      { child: any; lastRecord: any; isInFacility: boolean }
+    >();
 
-    todayRecords.forEach(record => {
-      const ninoId = record.nino_id
-      const isEntrada = record.tipo === 'entrada'
+    todayRecords.forEach((record) => {
+      const ninoId = record.nino_id;
+      const isEntrada = record.tipo === "entrada";
 
       if (!childrenStatus.has(ninoId)) {
         childrenStatus.set(ninoId, {
           child: record.ninos,
           lastRecord: record,
-          isInFacility: isEntrada
-        })
+          isInFacility: isEntrada,
+        });
       } else {
-        const current = childrenStatus.get(ninoId)!
+        const current = childrenStatus.get(ninoId)!;
         if (record.hora > current.lastRecord.hora) {
-          current.lastRecord = record
-          current.isInFacility = isEntrada
+          current.lastRecord = record;
+          current.isInFacility = isEntrada;
         }
       }
-    })
+    });
 
-    const ninosEnPlantel: ChildInFacility[] = []
+    const ninosEnPlantel: ChildInFacility[] = [];
 
     childrenStatus.forEach((status, ninoId) => {
       if (status.isInFacility) {
         const entradaRecord = todayRecords
-          .filter(r => r.nino_id === ninoId && r.tipo === 'entrada')
-          .sort((a, b) => b.hora.localeCompare(a.hora))[0]
+          .filter((r) => r.nino_id === ninoId && r.tipo === "entrada")
+          .sort((a, b) => b.hora.localeCompare(a.hora))[0];
 
         if (entradaRecord) {
-          const childData = {
+          let nombreRegistrador = "";
+
+          if (entradaRecord.terceros) {
+            nombreRegistrador = `${entradaRecord.terceros.nombres} ${entradaRecord.terceros.apellidos} (tercero)`;
+          } else if (entradaRecord.acudientes) {
+            nombreRegistrador = `${entradaRecord.acudientes.nombres} ${entradaRecord.acudientes.apellidos}`;
+          } else {
+            nombreRegistrador = "Desconocido";
+          }
+
+          ninosEnPlantel.push({
             id: status.child.id,
             nombres: status.child.nombres,
             apellidos: status.child.apellidos,
             numero_documento: status.child.numero_documento,
             hora_entrada: entradaRecord.hora,
-            acudiente_entrada: `${entradaRecord.acudientes.nombres} ${entradaRecord.acudientes.apellidos}`,
-            aula: status.child.aulas
-          }
-
-          ninosEnPlantel.push(childData)
+            acudiente_entrada: nombreRegistrador,
+            aula: status.child.aulas,
+          });
         }
       }
-    })
+    });
 
-    setChildrenInFacility(ninosEnPlantel)
+    setChildrenInFacility(ninosEnPlantel);
   } catch (error) {
-    console.error('Dashboard - Error loading children in facility:', error)
-    setChildrenInFacility([])
+    console.error("Dashboard - Error loading children in facility:", error);
+    setChildrenInFacility([]);
   }
-}
+};
+
 
 
   const getGreeting = () => {

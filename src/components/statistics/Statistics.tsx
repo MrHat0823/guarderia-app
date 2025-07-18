@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { toZonedTime } from 'date-fns-tz'
-import { format, subDays, parseISO, startOfWeek, endOfWeek } from 'date-fns'
-
-
+import { es } from 'date-fns/locale'
+import { format, subDays, parseISO } from 'date-fns'
 import {
   BarChart3,
   Calendar,
@@ -14,13 +13,12 @@ import {
   User,
   Shield,
   UserCheck,
-  Eye,
-  Filter
+  Eye
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { es } from 'date-fns/locale'
 import { useAuth } from '../../hooks/useAuth'
 
+/* ✅ Tipos */
 
 interface AttendanceRecord {
   id: string
@@ -68,7 +66,7 @@ interface UserStats {
   rol: string
   total_registros: number
   dias_trabajados: number
-  ultimo_registro?: string
+  ultimo_registro: string
 }
 
 export function Statistics() {
@@ -100,14 +98,7 @@ export function Statistics() {
   const loadStatistics = async () => {
     try {
       setLoading(true)
-
-
-      await Promise.all([
-        loadOverviewStats(),
-        loadChildrenStats(),
-        loadUsersStats()
-      ])
-
+      await Promise.all([loadOverviewStats(), loadChildrenStats(), loadUsersStats()])
     } catch (error) {
       console.error('Error loading statistics:', error)
     } finally {
@@ -116,19 +107,17 @@ export function Statistics() {
   }
 
   const loadOverviewStats = async () => {
-
     const { data, error } = await supabase
       .from('registros_asistencia')
-      .select('fecha, tipo, usuario_registra:users(guarderia_id)')
-      
+      .select('fecha, tipo')
+      .eq('guarderia_id', user?.guarderia_id)
+
     if (error) throw error
 
-    const filtered = data.filter(r => r.usuario_registra?.guarderia_id === user?.guarderia_id)
-
-    const totalRegistros = filtered.length
-    const totalEntradas = filtered.filter(r => r.tipo === 'entrada').length
-    const totalSalidas = filtered.filter(r => r.tipo === 'salida').length
-    const diasActivos = new Set(filtered.map(r => r.fecha)).size
+    const totalRegistros = data.length
+    const totalEntradas = data.filter((r) => r.tipo === 'entrada').length
+    const totalSalidas = data.filter((r) => r.tipo === 'salida').length
+    const diasActivos = new Set(data.map((r) => r.fecha)).size
 
     setOverviewStats({
       totalRegistros,
@@ -139,88 +128,93 @@ export function Statistics() {
   }
 
   const loadChildrenStats = async () => {
-
-  const { data, error } = await supabase
-    .from('registros_asistencia')
-    .select(`
-      id,
-      fecha,
-      tipo,
-      nino_id,
-      ninos (
-        id,
-        nombres,
-        apellidos,
-        numero_documento,
-        aulas (
-          nombre_aula,
-          nivel_educativo
-        )
-      ),
-      usuario_registra:users(guarderia_id)
-    `)
-
-  if (error) throw error
-
-  const filtered = data.filter(r => r.usuario_registra?.guarderia_id === user?.guarderia_id)
-
-  const childStats = filtered.reduce((acc, record) => {
-    const child = record.ninos
-    if (!child) return acc
-
-    if (!acc[child.id]) {
-      acc[child.id] = {
-        id: child.id,
-        nombres: child.nombres,
-        apellidos: child.apellidos,
-        numero_documento: child.numero_documento,
-        aula: child.aulas,
-        total_registros: 0,
-        entradas: 0,
-        salidas: 0,
-        ultimo_registro: record.fecha
-      }
-    }
-
-    acc[child.id].total_registros++
-    if (record.tipo === 'entrada') {
-      acc[child.id].entradas++
-    } else if (record.tipo === 'salida') {
-      acc[child.id].salidas++
-    }
-
-    if (record.fecha > acc[child.id].ultimo_registro!) {
-      acc[child.id].ultimo_registro = record.fecha
-    }
-
-    return acc
-  }, {} as Record<string, ChildStats>)
-
-  setChildrenStats(Object.values(childStats).sort((a, b) => b.total_registros - a.total_registros))
-}
-
-
-  const loadUsersStats = async () => {
-
     const { data, error } = await supabase
       .from('registros_asistencia')
       .select(`
+        id,
         fecha,
-        usuario_registra:users (
+        tipo,
+        nino_id,
+        ninos (
           id,
           nombres,
           apellidos,
           numero_documento,
-          rol,
-          guarderia_id
+          aulas (
+            nombre_aula,
+            nivel_educativo
+          )
         )
       `)
+      .eq('guarderia_id', user?.guarderia_id)
+      .not('nino_id', 'is', null)
 
     if (error) throw error
 
-    const filtered = data.filter(r => r.usuario_registra?.guarderia_id === user?.guarderia_id)
+    const childStats = data.reduce<Record<string, ChildStats>>((acc, record) => {
+      const child = record.ninos
+      if (!child) return acc
 
-    const userStats = filtered.reduce((acc, record) => {
+      if (!acc[child.id]) {
+        acc[child.id] = {
+          id: child.id,
+          nombres: child.nombres,
+          apellidos: child.apellidos,
+          numero_documento: child.numero_documento,
+          aula: child.aulas,
+          total_registros: 0,
+          entradas: 0,
+          salidas: 0,
+          ultimo_registro: record.fecha
+        }
+      }
+
+      acc[child.id].total_registros++
+      if (record.tipo === 'entrada') acc[child.id].entradas++
+      else if (record.tipo === 'salida') acc[child.id].salidas++
+
+      if (record.fecha > (acc[child.id].ultimo_registro || '')) {
+        acc[child.id].ultimo_registro = record.fecha
+      }
+
+      return acc
+    }, {})
+
+    setChildrenStats(Object.values(childStats).sort((a, b) => b.total_registros - a.total_registros))
+  }
+
+  const loadUsersStats = async (): Promise<void> => {
+    const { data, error } = await supabase
+      .from('registros_asistencia')
+      .select(`
+        fecha,
+        usuario_registra:users!registros_asistencia_usuario_registra_id_fkey (
+          id,
+          nombres,
+          apellidos,
+          numero_documento,
+          rol
+        )
+      `)
+      .eq('guarderia_id', user?.guarderia_id)
+
+    if (error) throw error
+
+    const userStats = (data || []).reduce<
+      Record<
+        string,
+        {
+          id: string
+          nombres: string
+          apellidos: string
+          numero_documento: string
+          rol: string
+          total_registros: number
+          dias_trabajados: Set<string>
+          ultimo_registro: string
+        }
+      >
+    >((acc, record) => {
       const userRegistra = record.usuario_registra
       if (!userRegistra) return acc
 
@@ -232,7 +226,7 @@ export function Statistics() {
           numero_documento: userRegistra.numero_documento,
           rol: userRegistra.rol,
           total_registros: 0,
-          dias_trabajados: new Set(),
+          dias_trabajados: new Set<string>(),
           ultimo_registro: record.fecha
         }
       }
@@ -240,76 +234,112 @@ export function Statistics() {
       acc[userRegistra.id].total_registros++
       acc[userRegistra.id].dias_trabajados.add(record.fecha)
 
-      if (record.fecha > acc[userRegistra.id].ultimo_registro!) {
+      if (record.fecha > acc[userRegistra.id].ultimo_registro) {
         acc[userRegistra.id].ultimo_registro = record.fecha
       }
 
       return acc
-    }, {} as Record<string, any>)
+    }, {})
 
-    const processedStats = Object.values(userStats).map((stat: any) => ({
-      ...stat,
-      dias_trabajados: stat.dias_trabajados.size
-    })).sort((a: any, b: any) => b.total_registros - a.total_registros)
+    const processedStats: UserStats[] = Object.values(userStats)
+      .map((stat) => ({
+        ...stat,
+        dias_trabajados: stat.dias_trabajados.size
+      }))
+      .sort((a, b) => b.total_registros - a.total_registros)
 
     setUsersStats(processedStats)
   }
 
   const loadHistory = async (type: 'child' | 'user', id: string) => {
-  const today = new Date()
-  const startDate = subDays(today, 30)
+    const today = new Date()
+    const startDate = subDays(today, 30)
 
-  const { data, error } = await supabase
-    .from('registros_asistencia')
-    .select(`
-      id,
-      fecha,
-      hora,
-      tipo,
-      anotacion,
-      ninos (
-        nombres,
-        apellidos,
-        numero_documento
-      ),
-      acudientes (
-        nombres,
-        apellidos,
-        numero_documento
-      ),
-      usuario_registra:users!registros_asistencia_usuario_registra_id_fkey (
-        nombres,
-        apellidos,
-        rol,
-        guarderia_id
-      )
-    `)
-    .eq(type === 'child' ? 'nino_id' : 'usuario_registra_id', id)
-    .gte('fecha', format(startDate, 'yyyy-MM-dd'))
-    .order('fecha', { ascending: false })
-    .order('hora', { ascending: false })
+    const { data, error } = await supabase
+      .from('registros_asistencia')
+      .select(`
+        id,
+        fecha,
+        hora,
+        tipo,
+        anotacion,
+        ninos (
+          nombres,
+          apellidos,
+          numero_documento
+        ),
+        acudientes (
+          nombres,
+          apellidos,
+          numero_documento
+        ),
+        terceros (
+          nombres,
+          apellidos,
+          numero_documento
+        ),
+        usuario_registra:users (
+          nombres,
+          apellidos,
+          rol
+        )
+      `)
+      .eq(type === 'child' ? 'nino_id' : 'usuario_registra_id', id)
+      .eq('guarderia_id', user?.guarderia_id)
+      .gte('fecha', format(startDate, 'yyyy-MM-dd'))
+      .order('fecha', { ascending: false })
+      .order('hora', { ascending: false })
 
-  if (error) {
-    console.error('Error loading history:', error)
-    setSelectedHistory([])
-    return
-  }
-
-  const filtered = (data || []).filter(record =>
-    record.usuario_registra?.guarderia_id === user?.guarderia_id
-  ).map(record => {
-    const utcDate = parseISO(record.fecha) // <- este paso es crucial
-    const zonedDate = toZonedTime(utcDate, 'America/Bogota')
-    return {
-      ...record,
-      fecha: format(zonedDate, 'dd/MM/yyyy')
+    if (error) {
+      console.error('Error loading history:', error)
+      setSelectedHistory([])
+      return
     }
-  })
 
-  setSelectedHistory(filtered)
-}
+    const filtered: AttendanceRecord[] = (data || []).map((record) => {
+    //  const utcDate = parseISO(record.fecha)
+    //  const zonedDate = toZonedTime(utcDate, 'America/Bogota')
 
+      const isTercero = !record.acudientes && !!record.terceros
 
+      return {
+        id: record.id,
+        fecha: format(new Date(record.fecha + 'T00:00:00'), 'yyyy-MM-dd'),
+        hora: record.hora,
+        tipo: record.tipo,
+        anotacion: record.anotacion,
+        nino: record.ninos
+          ? {
+              nombres: record.ninos.nombres,
+              apellidos: record.ninos.apellidos,
+              numero_documento: record.ninos.numero_documento
+            }
+          : undefined,
+        acudiente: isTercero
+          ? {
+              nombres: `${record.terceros?.nombres || ''} (Tercero)`,
+              apellidos: record.terceros?.apellidos || '',
+              numero_documento: record.terceros?.numero_documento || ''
+            }
+          : record.acudientes
+          ? {
+              nombres: record.acudientes.nombres,
+              apellidos: record.acudientes.apellidos,
+              numero_documento: record.acudientes.numero_documento
+            }
+          : undefined,
+        usuario_registra: record.usuario_registra
+          ? {
+              nombres: record.usuario_registra.nombres,
+              apellidos: record.usuario_registra.apellidos,
+              rol: record.usuario_registra.rol
+            }
+          : undefined
+      }
+    })
+
+    setSelectedHistory(filtered)
+  }
 
   const handleChildSelect = async (child: ChildStats) => {
     setSelectedChild(child)
@@ -321,25 +351,31 @@ export function Statistics() {
     await loadHistory('user', user.id)
   }
 
-  const filteredChildren = childrenStats.filter(child => {
+  const filteredChildren = childrenStats.filter((child) => {
     if (!childSearch.trim()) return true
     const searchLower = childSearch.toLowerCase()
     const fullName = `${child.nombres} ${child.apellidos}`.toLowerCase()
     return fullName.includes(searchLower) || child.numero_documento.includes(searchLower)
   })
 
-  const filteredUsers = usersStats.filter(user => {
+  const filteredUsers = usersStats.filter((user) => {
     if (!userSearch.trim()) return true
     const searchLower = userSearch.toLowerCase()
     const fullName = `${user.nombres} ${user.apellidos}`.toLowerCase()
     return fullName.includes(searchLower) || user.numero_documento.includes(searchLower)
   })
 
-  const StatCard = ({ title, value, subtitle, icon: Icon, color }: {
+  const StatCard = ({
+    title,
+    value,
+    subtitle,
+    icon: Icon,
+    color
+  }: {
     title: string
     value: string | number
     subtitle?: string
-    icon: React.ComponentType<any>
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
     color: string
   }) => (
     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
@@ -355,15 +391,6 @@ export function Statistics() {
       </div>
     </div>
   )
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mint-600"></div>
-      </div>
-    )
-  }
-
 
   return (
     <div className="p-6">
@@ -544,13 +571,14 @@ export function Statistics() {
                             {record.tipo}
                           </span>
                           <span className="text-sm font-medium text-gray-900">
-                            {format(new Date(record.fecha), 'dd/MM/yyyy', { locale: es })}
+                            {format(new Date(record.fecha + 'T00:00:00'), 'dd/MM/yyyy', { locale: es })}
+
                           </span>
                           <span className="text-sm text-gray-600">{record.hora.split('.')[0]}</span>
                         </div>
                       </div>
                       <div className="text-sm text-gray-600">
-                        <p><strong>Acudiente:</strong> {record.acudientes?.nombres} {record.acudientes?.apellidos}</p>
+                        <p><strong>Acudiente:</strong> {record.acudiente?.nombres} {record.acudiente?.apellidos}</p>
                         <p><strong>Registrado por:</strong> {record.usuario_registra?.nombres} {record.usuario_registra?.apellidos} ({record.usuario_registra?.rol})</p>
                         {record.anotacion && (
                           <p><strong>Nota:</strong> {record.anotacion}</p>
@@ -687,7 +715,8 @@ export function Statistics() {
                       </div>
                       <div className="text-sm text-gray-600">
                         <p><strong>Niño:</strong> {record.nino?.nombres} {record.nino?.apellidos}</p>
-                        <p><strong>Acudiente:</strong> {record.acudientes?.nombres} {record.acudientes?.apellidos}</p>
+                        <p><strong>Acudiente:</strong> {record.acudiente?.nombres} {record.acudiente?.apellidos}</p>
+
                         <p><strong>Registrado por:</strong> {record.usuario_registra?.nombres} {record.usuario_registra?.apellidos} ({record.usuario_registra?.rol})</p>
                         {record.anotacion && (
                           <p><strong>Nota:</strong> {record.anotacion}</p>
