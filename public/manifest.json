@@ -1,0 +1,71 @@
+{
+  "name": "Sistema de Gestión de Guarderías",
+  "short_name": "Guarderías",
+  "description": "Sistema de gestión y control de asistencia para guarderías infantiles",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#14b8a6",
+  "orientation": "portrait-primary",
+  "categories": ["education", "productivity"],
+  "lang": "es-ES",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/icono-app.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icono-app.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icono-app.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icono-app.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Inicio",
+      "description": "Ir al dashboard principal",
+      "url": "/",
+      "icons": [{ "src": "/icono-app.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Escáner QR",
+      "short_name": "QR",
+      "description": "Abrir escáner de códigos QR",
+      "url": "/?tab=qr-scanner",
+      "icons": [{ "src": "/icono-app.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ]
+}
+

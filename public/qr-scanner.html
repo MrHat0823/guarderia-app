@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escáner QR</title>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f9fafb;
+        }
+        
+        #reader {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 0 10px;
+        }
+        
+        button:hover {
+            background: #047857;
+        }
+        
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 2px solid #10b981;
+            text-align: center;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button id="start-btn" onclick="startScanning()">Iniciar Escáner</button>
+        <button id="stop-btn" onclick="stopScanning()" disabled>Detener Escáner</button>
+    </div>
+    
+    <div id="reader"></div>
+    
+    <div id="result" class="result hidden">
+        <h3>Código escaneado:</h3>
+        <p id="result-text"></p>
+        <button onclick="sendToParent()">Usar este código</button>
+    </div>
+
+    <script>
+        let html5QrcodeScanner = null;
+        let lastScannedCode = '';
+
+        function startScanning() {
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", config, false);
+            
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+            
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('stop-btn').disabled = false;
+        }
+
+        function stopScanning() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.clear().then(() => {
+                    html5QrcodeScanner = null;
+                    document.getElementById('start-btn').disabled = false;
+                    document.getElementById('stop-btn').disabled = true;
+                }).catch(err => {
+                    console.error('Error stopping scanner:', err);
+                });
+            }
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            console.log(`Código escaneado: ${decodedText}`);
+            lastScannedCode = decodedText;
+            
+            // Mostrar resultado
+            document.getElementById('result-text').textContent = decodedText;
+            document.getElementById('result').classList.remove('hidden');
+            
+            // Enviar inmediatamente a la aplicación padre
+            sendToParent();
+            
+            // Detener escáner después de un breve delay
+            setTimeout(() => {
+                stopScanning();
+            }, 1000);
+        }
+
+        function onScanFailure(error) {
+            // Silenciar errores de escaneo continuo
+        }
+
+        function sendToParent() {
+            // Enviar resultado a la ventana padre (React app)
+            if (window.parent && window.parent !== window) {
+                console.log('Enviando código a la aplicación padre:', lastScannedCode);
+                window.parent.postMessage({
+                    type: 'QR_SCANNED',
+                    data: lastScannedCode
+                }, '*');
+            } else {
+                console.log('No se pudo enviar a la ventana padre');
+            }
+        }
+
+        // Escuchar mensajes del padre para controlar el escáner
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'START_SCANNER') {
+                startScanning();
+            } else if (event.data.type === 'STOP_SCANNER') {
+                stopScanning();
+            }
+        });
+    </script>
+</body>
+</html>

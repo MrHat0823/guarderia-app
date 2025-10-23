@@ -1,0 +1,5 @@
+{
+  "schedule": "0 18 * * 1-6",
+  "timezone": "America/Bogota"
+}
+

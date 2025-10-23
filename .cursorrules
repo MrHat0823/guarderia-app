@@ -1,0 +1,56 @@
+# Respuestas del agente
+- Sé claro, conciso y directo. Máximo 10 líneas de explicación.
+- Responde con código funcional y relevante, sin ejemplos inútiles.
+- Nunca crees archivos temporales (.js o similares) para pruebas.
+- Solo genera código sobre los archivos reales del proyecto.
+
+# Estilo de código
+- Usa camelCase para variables y funciones.
+- Usa PascalCase para nombres de componentes.
+- No uses var, solo const o let.
+- Formato: 2 espacios, punto y coma al final de cada línea.
+- No uses inline CSS; aplica clases de Tailwind para estilos.
+
+# Organización Frontend
+- Todos los componentes van en /src/components.
+- No mezcles lógica de negocio con componentes; usa /src/services para llamadas API.
+- Hooks personalizados en /src/hooks y empiezan con use.
+- Usa componentes funcionales, no clases.
+- Cada componente debe exportarse por defecto.
+
+# Organización Backend
+- Todas las rutas en /routes, controladores en /controllers, lógica de negocio en /services.
+- No coloques consultas SQL directas en controladores, solo en /db o /models.
+- Usa variables de entorno para credenciales y configuración (archivo .env).
+- Implementa manejo de errores con middleware centralizado en /middleware/errorHandler.js.
+
+# Base de datos
+- Todas las consultas SQL deben usar parámetros para evitar inyecciones.
+- No uses consultas dinámicas con string concatenado.
+- Estructura recomendada:
+  ✅ Bueno:
+  const result = await db.query("SELECT * FROM users WHERE id = ?", [id]);
+  ❌ Malo:
+  const result = await db.query("SELECT * FROM users WHERE id = " + id);
+
+# Buenas prácticas
+- Mantén separación estricta entre UI y lógica.
+- No generes comentarios innecesarios en el código.
+- Cada endpoint debe tener validación de datos con middleware (ej. express-validator).
+- Responde siempre en formato JSON en el backend.
+
+# Ejemplo correcto
+✅ Frontend:
+export default function UserCard({ user }) {
+  return (
+    <div className="p-4 bg-white rounded shadow">
+      <h2 className="text-xl font-bold">{user.name}</h2>
+    </div>
+  );
+}
+
+✅ Backend:
+router.get("/users/:id", validateUserId, async (req, res) => {
+  const user = await userService.getById(req.params.id);
+  res.json(user);
+});
