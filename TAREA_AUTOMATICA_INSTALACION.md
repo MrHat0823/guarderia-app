@@ -259,3 +259,5 @@ La tarea automática ya está configurada. A las 6:00 PM de cada día (lunes a s
 SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 1;
 ```
 
+
+

@@ -288,3 +288,5 @@ Tu sistema ahora es una **Progressive Web App completa** que:
 
 **Solo falta crear los iconos y desplegar a producción.** 🚀
 
+
+

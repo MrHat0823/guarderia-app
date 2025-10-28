@@ -92,3 +92,5 @@ La PWA funcionará, pero el icono puede verse estirado.
 
 Cuando tengas las 4 versiones, el sistema las usará automáticamente.
 
+
+

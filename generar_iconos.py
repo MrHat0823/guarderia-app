@@ -96,3 +96,5 @@ if __name__ == '__main__':
         print("\n💡 Si no tienes Pillow instalado, ejecuta:")
         print("   pip install Pillow")
 
+
+

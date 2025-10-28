@@ -164,3 +164,5 @@ Ver ejecuciones en Supabase Dashboard:
 - Se preserva el acudiente/tercero original de la entrada
 - Hora fija: 18:00 (no hora actual)
 
+
+

@@ -131,3 +131,5 @@ END $$;
 -- Ejecutar manualmente (para pruebas):
 -- SELECT * FROM cerrar_asistencias_automaticas();
 
+
+

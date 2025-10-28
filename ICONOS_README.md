@@ -155,3 +155,5 @@ Cambia en `/public/manifest.json`:
 
 ¿Dudas? Ejecuta `python generar_iconos.py` y listo! 🚀
 
+
+
