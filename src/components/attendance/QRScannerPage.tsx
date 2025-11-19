@@ -85,6 +85,7 @@ export function QRScannerPage() {
     })
     setSelectedNino(null)
     setShowAttendanceForm(false)
+    setIsProcessing(false)
   }
 
   const handleScan = async (rawData: string) => {
@@ -261,6 +262,7 @@ export function QRScannerPage() {
       setAcudienteData(null)
       setMultipleChildren([])
       setScannedDoc('')
+      setIsProcessing(false)
     } catch (error) {
       console.error('Error al registrar asistencia:', error)
       toast.error('Error al registrar asistencia.')
@@ -276,7 +278,10 @@ export function QRScannerPage() {
       </h1>
 
       <button
-        onClick={() => setShowScanner(true)}
+        onClick={() => {
+          setIsProcessing(false)
+          setShowScanner(true)
+        }}
         className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 transition-colors duration-200 text-white px-4 py-2 rounded-md flex items-center justify-center gap-2 mb-6 shadow-sm"
       >
         <Camera className="w-5 h-5" /> Activar escáner
@@ -285,7 +290,10 @@ export function QRScannerPage() {
       <QRScanner
         onScan={handleScan}
         isActive={showScanner}
-        onClose={() => setShowScanner(false)}
+        onClose={() => {
+          setIsProcessing(false)
+          setShowScanner(false)
+        }}
         isProcessing={isProcessing}
       />
 
