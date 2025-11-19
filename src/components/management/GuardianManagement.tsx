@@ -30,6 +30,7 @@ export function GuardianManagement() {
   const [showLinkForm, setShowLinkForm] = useState(false)
   const [selectedGuardian, setSelectedGuardian] = useState<Acudiente | null>(null)
   const [selectedChildrenWithParentesco, setSelectedChildrenWithParentesco] = useState<Array<{childId: string, parentesco: TipoParentesco}>>([])
+  const [initialChildrenWithParentesco, setInitialChildrenWithParentesco] = useState<Array<{childId: string, parentesco: TipoParentesco}>>([])
   const [childSearchTerm, setChildSearchTerm] = useState('')
   const [editingGuardian, setEditingGuardian] = useState<Acudiente | null>(null)
   const [generatingQR, setGeneratingQR] = useState<string | null>(null)
@@ -316,6 +317,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     }))
     
     setSelectedChildrenWithParentesco(existingRelations)
+    setInitialChildrenWithParentesco(existingRelations)
     setShowLinkForm(true)
   }
 
@@ -341,7 +343,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   }
 
 const handleLinkChildren = async () => {
-  if (!selectedGuardian || selectedChildrenWithParentesco.length === 0) return
+  if (!selectedGuardian) return
 
   try {
     const relationships = selectedChildrenWithParentesco.map(item => ({
@@ -350,18 +352,34 @@ const handleLinkChildren = async () => {
       parentesco: item.parentesco
     }))
 
-    // Insertar nuevas relaciones, evitando duplicados (clave única nino_id + acudiente_id)
-    const { error } = await supabase
-      .from('nino_acudiente')
-      .upsert(relationships, {
-        onConflict: 'nino_id,acudiente_id' // Usa la constraint única que ya definiste
-      })
+    const initialIds = initialChildrenWithParentesco.map(item => item.childId)
+    const selectedIds = selectedChildrenWithParentesco.map(item => item.childId)
+    const idsToDelete = initialIds.filter(id => !selectedIds.includes(id))
 
-    if (error) throw error
+    if (relationships.length > 0) {
+      const { error } = await supabase
+        .from('nino_acudiente')
+        .upsert(relationships, {
+          onConflict: 'nino_id,acudiente_id'
+        })
+
+      if (error) throw error
+    }
+
+    if (idsToDelete.length > 0) {
+      const { error } = await supabase
+        .from('nino_acudiente')
+        .delete()
+        .eq('acudiente_id', selectedGuardian.id)
+        .in('nino_id', idsToDelete)
+
+      if (error) throw error
+    }
 
     setShowLinkForm(false)
     setSelectedGuardian(null)
     setSelectedChildrenWithParentesco([])
+    setInitialChildrenWithParentesco([])
     setChildSearchTerm('')
   } catch (error) {
     console.error('Error linking children:', error)
@@ -733,7 +751,7 @@ const handleLinkChildren = async () => {
               <div className="flex gap-4 pt-6">
                 <button
                   onClick={handleLinkChildren}
-                  disabled={selectedChildrenWithParentesco.length === 0}
+                  disabled={selectedChildrenWithParentesco.length === 0 && initialChildrenWithParentesco.length === 0}
                   className="bg-mint-600 hover:bg-mint-700 disabled:bg-gray-300 text-white px-6 py-2 rounded-lg transition-colors"
                 >
                   Asignar Niños
@@ -743,6 +761,11 @@ const handleLinkChildren = async () => {
                     setShowLinkForm(false)
                     setSelectedGuardian(null)
                     setSelectedChildrenWithParentesco([])
+                    setChildSearchTerm('')
+                    setShowLinkForm(false)
+                    setSelectedGuardian(null)
+                    setSelectedChildrenWithParentesco([])
+                    setInitialChildrenWithParentesco([])
                     setChildSearchTerm('')
                   }}
                   className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors"

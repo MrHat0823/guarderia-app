@@ -59,6 +59,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   })
   const [childrenInFacility, setChildrenInFacility] = useState<ChildInFacility[]>([])
   const [showChildrenList, setShowChildrenList] = useState(false)
+  const [childrenSearchTerm, setChildrenSearchTerm] = useState('')
 
   // Actualizar hora cada segundo
   useEffect(() => {
@@ -338,6 +339,10 @@ const loadChildrenInFacility = async () => {
 
   const greeting = getGreeting()
   const timeIcon = getTimeIcon()
+  const normalizedSearch = childrenSearchTerm.trim().toLowerCase()
+  const filteredChildrenInFacility = childrenInFacility.filter((child) =>
+    `${child.nombres} ${child.apellidos}`.toLowerCase().includes(normalizedSearch)
+  )
 
   // Solo mostrar pantalla de carga completa en la carga inicial
   if (initialLoading) {
@@ -438,7 +443,10 @@ const loadChildrenInFacility = async () => {
             title="En el Plantel"
             value={childrenInFacility.length}
             color="bg-purple-100 text-purple-600"
-            onClick={() => setShowChildrenList(true)}
+            onClick={() => {
+              setChildrenSearchTerm('')
+              setShowChildrenList(true)
+            }}
             refreshing={refreshing}
           />
         </div>
@@ -559,7 +567,7 @@ const loadChildrenInFacility = async () => {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
               <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-purple-100">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                       <MapPin className="w-6 h-6 text-purple-600" />
@@ -569,21 +577,33 @@ const loadChildrenInFacility = async () => {
                       {childrenInFacility.length} niños con entrada registrada sin salida del día
                     </p>
                   </div>
-                  <button
-                    onClick={() => setShowChildrenList(false)}
-                    className="p-2 hover:bg-white/50 rounded-lg transition-colors"
-                  >
-                    <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center gap-3 w-full lg:w-auto">
+                    <input
+                      type="text"
+                      value={childrenSearchTerm}
+                      onChange={(e) => setChildrenSearchTerm(e.target.value)}
+                      placeholder="Buscar por nombre o apellido..."
+                      className="px-3 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-mint-500 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        setShowChildrenList(false)
+                        setChildrenSearchTerm('')
+                      }}
+                      className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                    >
+                      <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
               
               <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-                {childrenInFacility.length > 0 ? (
+                {filteredChildrenInFacility.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {childrenInFacility.map((child) => (
+                    {filteredChildrenInFacility.map((child) => (
                       <div key={child.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
