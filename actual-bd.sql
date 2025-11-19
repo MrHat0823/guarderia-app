@@ -83,6 +83,18 @@ CREATE TABLE public.registros_asistencia (
   guarderia_id uuid,
   aula_id uuid,
   tercero_id uuid,
+  -- Campos de observaciones para entrada
+  fiebre boolean NOT NULL DEFAULT false,
+  mordidas boolean NOT NULL DEFAULT false,
+  aruñado boolean NOT NULL DEFAULT false,
+  golpes boolean NOT NULL DEFAULT false,
+  otro boolean NOT NULL DEFAULT false,
+  otro_texto text,
+  -- Campos de observaciones para salida
+  fiebre_salida boolean NOT NULL DEFAULT false,
+  mordidas_salida boolean NOT NULL DEFAULT false,
+  aruñado_salida boolean NOT NULL DEFAULT false,
+  golpes_salida boolean NOT NULL DEFAULT false,
   CONSTRAINT registros_asistencia_pkey PRIMARY KEY (id),
   CONSTRAINT registros_asistencia_nino_id_fkey FOREIGN KEY (nino_id) REFERENCES public.ninos(id),
   CONSTRAINT registros_asistencia_acudiente_id_fkey FOREIGN KEY (acudiente_id) REFERENCES public.acudientes(id),

@@ -113,15 +113,27 @@ export interface AttendanceRecord {
   tipo: AttendanceType
   nino_id: string
   acudiente_id?: string
-  tercero_id?: string            // NUEVO
+  tercero_id?: string
   usuario_registra_id: string
   guarderia_id?: string
   aula_id?: string
   anotacion?: string
+  // Campos de observaciones para entrada
+  fiebre?: boolean
+  mordidas?: boolean
+  aruñado?: boolean
+  golpes?: boolean
+  otro?: boolean
+  otro_texto?: string
+  // Campos de observaciones para salida
+  fiebre_salida?: boolean
+  mordidas_salida?: boolean
+  aruñado_salida?: boolean
+  golpes_salida?: boolean
   created_at: string
   nino?: Nino
   acudiente?: Acudiente
-  tercero?: Tercero              // NUEVO
+  tercero?: Tercero
   usuario_registra?: User
 }
 
@@ -131,6 +143,7 @@ export interface AttendanceStats {
   asistenciaHoy: number
   totalEntradas: number
   totalSalidas: number
+  inasistencia: number
 }
 
 export interface DaycareConfig {

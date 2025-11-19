@@ -16,7 +16,9 @@ import {
   Sunrise,
   Sunset,
   Activity,
-  BarChart3
+  BarChart3,
+  Search,
+  X
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -55,11 +57,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     ninosActivos: 0,
     asistenciaHoy: 0,
     totalEntradas: 0,
-    totalSalidas: 0
+    totalSalidas: 0,
+    inasistencia: 0
   })
   const [childrenInFacility, setChildrenInFacility] = useState<ChildInFacility[]>([])
   const [showChildrenList, setShowChildrenList] = useState(false)
   const [childrenSearchTerm, setChildrenSearchTerm] = useState('')
+  const [showQuickSearch, setShowQuickSearch] = useState(false)
+  const [acudienteSearchTerm, setAcudienteSearchTerm] = useState('')
+  const [ninoSearchTerm, setNinoSearchTerm] = useState('')
+  const [acudienteResult, setAcudienteResult] = useState<any>(null)
+  const [ninoResult, setNinoResult] = useState<any>(null)
+  const [searching, setSearching] = useState(false)
 
   // Actualizar hora cada segundo
   useEffect(() => {
@@ -137,12 +146,17 @@ const loadStats = async (isInitial = false) => {
       .eq('tipo', 'salida')
       .eq('guarderia_id', user?.guarderia_id)
 
+    const ninosActivosCount = ninosActivos ?? 0
+    const asistenciaHoyCount = asistenciaHoy ?? 0
+    const inasistenciaCount = Math.max(0, ninosActivosCount - asistenciaHoyCount)
+
     setStats({
       totalNinos: totalNinos ?? 0,
-      ninosActivos: ninosActivos ?? 0,
-      asistenciaHoy: asistenciaHoy ?? 0, // ✅ corregido
+      ninosActivos: ninosActivosCount,
+      asistenciaHoy: asistenciaHoyCount,
       totalEntradas: totalEntradas ?? 0,
-      totalSalidas: totalSalidas ?? 0
+      totalSalidas: totalSalidas ?? 0,
+      inasistencia: inasistenciaCount
     })
   } catch (error) {
     console.error('Dashboard - Error general en loadStats:', error)
@@ -151,7 +165,8 @@ const loadStats = async (isInitial = false) => {
       ninosActivos: 0,
       asistenciaHoy: 0,
       totalEntradas: 0,
-      totalSalidas: 0
+      totalSalidas: 0,
+      inasistencia: 0
     })
   } finally {
     if (isInitial) {
@@ -292,8 +307,111 @@ const loadChildrenInFacility = async () => {
     }
   }
 
-  const StatCard = ({ icon: Icon, title, value, color, trend, onClick, refreshing }: {
-    icon: React.ComponentType<any>
+  const searchAcudiente = async (searchTerm: string) => {
+    if (!searchTerm.trim() || !user?.guarderia_id) {
+      setAcudienteResult(null)
+      return
+    }
+
+    setSearching(true)
+    try {
+      const { data, error } = await supabase
+        .from('acudientes')
+        .select(`
+          id,
+          nombres,
+          apellidos,
+          tipo_documento,
+          numero_documento,
+          nino_acudiente (
+            parentesco,
+            ninos (
+              id,
+              nombres,
+              apellidos,
+              aulas (
+                nombre_aula,
+                nivel_educativo
+              )
+            )
+          )
+        `)
+        .eq('guarderia_id', user.guarderia_id)
+        .or(`nombres.ilike.%${searchTerm}%,apellidos.ilike.%${searchTerm}%,numero_documento.ilike.%${searchTerm}%`)
+        .limit(1)
+        .maybeSingle()
+
+      if (error) throw error
+      setAcudienteResult(data)
+    } catch (error) {
+      console.error('Error buscando acudiente:', error)
+      setAcudienteResult(null)
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const searchNino = async (searchTerm: string) => {
+    if (!searchTerm.trim() || !user?.guarderia_id) {
+      setNinoResult(null)
+      return
+    }
+
+    setSearching(true)
+    try {
+      const { data, error } = await supabase
+        .from('ninos')
+        .select(`
+          id,
+          nombres,
+          apellidos,
+          tipo_documento,
+          numero_documento,
+          nino_acudiente (
+            parentesco,
+            acudientes (
+              id,
+              nombres,
+              apellidos
+            )
+          )
+        `)
+        .eq('guarderia_id', user.guarderia_id)
+        .or(`nombres.ilike.%${searchTerm}%,apellidos.ilike.%${searchTerm}%,numero_documento.ilike.%${searchTerm}%`)
+        .limit(1)
+        .maybeSingle()
+
+      if (error) throw error
+      setNinoResult(data)
+    } catch (error) {
+      console.error('Error buscando niño:', error)
+      setNinoResult(null)
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const handleAcudienteSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    searchAcudiente(acudienteSearchTerm)
+  }
+
+  const handleNinoSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    searchNino(ninoSearchTerm)
+  }
+
+  const resetQuickSearch = () => {
+    setShowQuickSearch(false)
+    setAcudienteSearchTerm('')
+    setNinoSearchTerm('')
+    setAcudienteResult(null)
+    setNinoResult(null)
+  }
+
+  const StatCard = ({ icon: Icon, iconImage, title, value, color, trend, onClick, refreshing }: {
+    icon?: React.ComponentType<any>
+    iconImage?: string
     title: string
     value: number
     color: string
@@ -322,10 +440,14 @@ const loadChildrenInFacility = async () => {
             </p>
           )}
         </div>
-        <div className={`w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-300 ${color} ${
+        <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-lg flex items-center justify-center transition-all duration-300 ${color} ${
           refreshing ? 'animate-pulse' : ''
         }`}>
-          <Icon className="w-6 h-6" />
+          {iconImage ? (
+            <img src={iconImage} alt={title} className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+          ) : Icon ? (
+            <Icon className="w-6 h-6 sm:w-7 sm:h-7" />
+          ) : null}
         </div>
       </div>
       {onClick && (
@@ -421,25 +543,25 @@ const loadChildrenInFacility = async () => {
           refreshing ? 'opacity-90' : 'opacity-100'
         }`}>
           <StatCard
-            icon={Baby}
+            iconImage="/nino.png"
             title="Total Niños"
             value={stats.totalNinos}
             color="bg-blue-100 text-blue-600"
           />
           <StatCard
-            icon={CheckCircle}
+            iconImage="/activo.png"
             title="Niños Activos"
             value={stats.ninosActivos}
             color="bg-green-100 text-green-600"
           />
           <StatCard
-            icon={UserCheck}
+            iconImage="/asistencia.png"
             title="Asistencia Hoy"
             value={stats.asistenciaHoy}
             color="bg-mint-100 text-mint-600"
           />
           <StatCard
-            icon={MapPin}
+            iconImage="/gps.png"
             title="En el Plantel"
             value={childrenInFacility.length}
             color="bg-purple-100 text-purple-600"
@@ -463,8 +585,8 @@ const loadChildrenInFacility = async () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-white" />
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <img src="/entrada.png" alt="Entradas" className="w-7 h-7 sm:w-8 sm:h-8 object-contain" />
                   </div>
                   <div>
                     <p className="font-medium text-gray-900">Entradas</p>
@@ -476,33 +598,18 @@ const loadChildrenInFacility = async () => {
                 </span>
               </div>
               
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border border-red-200">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
-                    <Clock className="w-6 h-6 text-white" />
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <img src="/inasistencia.png" alt="Inasistencia" className="w-7 h-7 sm:w-8 sm:h-8 object-contain" />
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">Salidas</p>
-                    <p className="text-sm text-gray-600">Niños que se fueron</p>
+                    <p className="font-medium text-gray-900">Inasistencia</p>
+                    <p className="text-sm text-gray-600">Niños que no registraron entrada</p>
                   </div>
                 </div>
-                <span className="text-3xl font-bold text-orange-600">
-                  {stats.totalSalidas}
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
-                    <MapPin className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">En el plantel</p>
-                    <p className="text-sm text-gray-600">Niños actualmente presentes</p>
-                  </div>
-                </div>
-                <span className="text-3xl font-bold text-purple-600">
-                  {childrenInFacility.length}
+                <span className="text-3xl font-bold text-red-600">
+                  {stats.inasistencia}
                 </span>
               </div>
             </div>
@@ -526,12 +633,12 @@ const loadChildrenInFacility = async () => {
               </button>
               
               <button 
-                onClick={() => handleQuickAction('statistics')}
+                onClick={() => setShowQuickSearch(true)}
                 className="group p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl hover:from-blue-100 hover:to-blue-200 transition-all duration-200 border border-blue-200 hover:shadow-md"
               >
-                <BarChart3 className="w-10 h-10 text-blue-600 mb-3 group-hover:scale-110 transition-transform" />
+                <Search className="w-10 h-10 text-blue-600 mb-3 group-hover:scale-110 transition-transform" />
                 <p className="text-sm font-medium text-gray-900">
-                  Ver Estadísticas
+                  Búsqueda Rápida
                 </p>
               </button>
               
@@ -667,6 +774,177 @@ const loadChildrenInFacility = async () => {
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Búsqueda Rápida */}
+        {showQuickSearch && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                      <Search className="w-6 h-6 text-blue-600" />
+                      Búsqueda Rápida
+                    </h2>
+                    <p className="text-gray-600 mt-1">
+                      Busca acudientes o niños por nombre o documento
+                    </p>
+                  </div>
+                  <button
+                    onClick={resetQuickSearch}
+                    className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                  >
+                    <X className="w-6 h-6 text-gray-500" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Búsqueda de Acudiente */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      <Users className="w-5 h-5 text-blue-600" />
+                      Buscar Acudiente
+                    </h3>
+                    <form onSubmit={handleAcudienteSearch} className="space-y-3">
+                      <input
+                        type="text"
+                        value={acudienteSearchTerm}
+                        onChange={(e) => setAcudienteSearchTerm(e.target.value)}
+                        placeholder="Nombre o documento del acudiente..."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <button
+                        type="submit"
+                        disabled={searching || !acudienteSearchTerm.trim()}
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        {searching ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                            Buscando...
+                          </>
+                        ) : (
+                          <>
+                            <Search className="w-5 h-5" />
+                            Buscar
+                          </>
+                        )}
+                      </button>
+                    </form>
+
+                    {acudienteResult && (
+                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <h4 className="font-semibold text-gray-900 mb-3">Resultado:</h4>
+                        <div className="space-y-2 text-sm">
+                          <p><span className="font-medium">Nombre completo:</span> {acudienteResult.nombres} {acudienteResult.apellidos}</p>
+                          <p><span className="font-medium">Tipo documento:</span> {acudienteResult.tipo_documento}</p>
+                          <p><span className="font-medium">Número de documento:</span> {acudienteResult.numero_documento}</p>
+                          
+                          {acudienteResult.nino_acudiente && acudienteResult.nino_acudiente.length > 0 && (
+                            <div className="mt-3">
+                              <p className="font-medium mb-2">Niños vinculados:</p>
+                              <ul className="space-y-2">
+                                {acudienteResult.nino_acudiente.map((rel: any, idx: number) => {
+                                  const nino = rel.ninos
+                                  const aula = Array.isArray(nino.aulas) ? nino.aulas[0] : nino.aulas
+                                  return (
+                                    <li key={idx} className="pl-4 border-l-2 border-blue-300">
+                                      <p className="font-medium">{nino.nombres} {nino.apellidos}</p>
+                                      <p className="text-gray-600">Parentesco: {rel.parentesco}</p>
+                                      {aula && (
+                                        <p className="text-gray-600">Aula: {aula.nombre_aula} - {aula.nivel_educativo}</p>
+                                      )}
+                                    </li>
+                                  )
+                                })}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {acudienteSearchTerm && !acudienteResult && !searching && (
+                      <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-500">
+                        No se encontraron resultados
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Búsqueda de Niño */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      <Baby className="w-5 h-5 text-purple-600" />
+                      Buscar Niño
+                    </h3>
+                    <form onSubmit={handleNinoSearch} className="space-y-3">
+                      <input
+                        type="text"
+                        value={ninoSearchTerm}
+                        onChange={(e) => setNinoSearchTerm(e.target.value)}
+                        placeholder="Nombre o documento del niño..."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                      <button
+                        type="submit"
+                        disabled={searching || !ninoSearchTerm.trim()}
+                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        {searching ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                            Buscando...
+                          </>
+                        ) : (
+                          <>
+                            <Search className="w-5 h-5" />
+                            Buscar
+                          </>
+                        )}
+                      </button>
+                    </form>
+
+                    {ninoResult && (
+                      <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                        <h4 className="font-semibold text-gray-900 mb-3">Resultado:</h4>
+                        <div className="space-y-2 text-sm">
+                          <p><span className="font-medium">Nombre completo:</span> {ninoResult.nombres} {ninoResult.apellidos}</p>
+                          <p><span className="font-medium">Tipo documento:</span> {ninoResult.tipo_documento}</p>
+                          <p><span className="font-medium">Número de documento:</span> {ninoResult.numero_documento}</p>
+                          
+                          {ninoResult.nino_acudiente && ninoResult.nino_acudiente.length > 0 && (
+                            <div className="mt-3">
+                              <p className="font-medium mb-2">Acudientes vinculados:</p>
+                              <ul className="space-y-2">
+                                {ninoResult.nino_acudiente.map((rel: any, idx: number) => {
+                                  const acudiente = rel.acudientes
+                                  return (
+                                    <li key={idx} className="pl-4 border-l-2 border-purple-300">
+                                      <p className="font-medium">{acudiente.nombres} {acudiente.apellidos}</p>
+                                      <p className="text-gray-600">Parentesco: {rel.parentesco}</p>
+                                    </li>
+                                  )
+                                })}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {ninoSearchTerm && !ninoResult && !searching && (
+                      <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-500">
+                        No se encontraron resultados
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -49,6 +49,18 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
   const [canRegisterSalida, setCanRegisterSalida] = useState(false)
   const [showChildrenModal, setShowChildrenModal] = useState(false)
   const [childSearch, setChildSearch] = useState('')
+  const [observaciones, setObservaciones] = useState({
+    fiebre: false,
+    mordidas: false,
+    aruñado: false,
+    golpes: false,
+    otro: false,
+    otro_texto: '',
+    fiebre_salida: false,
+    mordidas_salida: false,
+    aruñado_salida: false,
+    golpes_salida: false,
+  })
 
   useEffect(() => {
     if (initialDocumento) {
@@ -183,6 +195,18 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
     setSelectedNino('')
     setSelectedChildData(null)
     setChildSearch('')
+    setObservaciones({
+      fiebre: false,
+      mordidas: false,
+      aruñado: false,
+      golpes: false,
+      otro: false,
+      otro_texto: '',
+      fiebre_salida: false,
+      mordidas_salida: false,
+      aruñado_salida: false,
+      golpes_salida: false,
+    })
   }
 
   const handleDocumentSearch = (e: React.FormEvent) => {
@@ -209,7 +233,7 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
     setLoading(true)
 
     try {
-      const { error } = await supabase.from('registros_asistencia').insert({
+      const insertData: any = {
         tipo,
         nino_id: selectedNino,
         acudiente_id: acudiente.id,
@@ -218,7 +242,25 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
         guarderia_id: selectedChildData?.guarderia_id || user.guarderia_id,
         aula_id: selectedChildData?.aula?.id || null,
         fecha: getFechaHoyColombia(),
-      })
+      }
+
+      if (tipo === 'entrada') {
+        insertData.fiebre = observaciones.fiebre
+        insertData.mordidas = observaciones.mordidas
+        insertData.aruñado = observaciones.aruñado
+        insertData.golpes = observaciones.golpes
+        insertData.otro = observaciones.otro
+        if (observaciones.otro && observaciones.otro_texto.trim()) {
+          insertData.otro_texto = observaciones.otro_texto.trim()
+        }
+      } else {
+        insertData.fiebre_salida = observaciones.fiebre_salida
+        insertData.mordidas_salida = observaciones.mordidas_salida
+        insertData.aruñado_salida = observaciones.aruñado_salida
+        insertData.golpes_salida = observaciones.golpes_salida
+      }
+
+      const { error } = await supabase.from('registros_asistencia').insert(insertData)
 
       if (error) {
         toast.error('Error al registrar la asistencia')
@@ -237,6 +279,18 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
         setFilteredNinos([])
         setAnotacion('')
         setTipo('entrada')
+        setObservaciones({
+          fiebre: false,
+          mordidas: false,
+          aruñado: false,
+          golpes: false,
+          otro: false,
+          otro_texto: '',
+          fiebre_salida: false,
+          mordidas_salida: false,
+          aruñado_salida: false,
+          golpes_salida: false,
+        })
       }
 
       if (onRegistrationComplete) onRegistrationComplete()
@@ -477,6 +531,148 @@ export function AttendanceControl({ initialDocumento = '', onRegistrationComplet
                 </button>
 
               </div>
+            </div>
+
+            {/* Observaciones */}
+            <div className="mb-4 sm:mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Observaciones {tipo === 'entrada' ? 'de Entrada' : 'de Salida'}
+              </label>
+              
+              {tipo === 'entrada' ? (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={observaciones.fiebre}
+                      onChange={(e) => setObservaciones({ ...observaciones, fiebre: e.target.checked })}
+                      className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                      disabled={loading}
+                    />
+                    <img src="/fiebre.png" alt="Fiebre" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                    <span className="flex-1 text-gray-700">Fiebre</span>
+                    <span className="text-sm text-gray-500">{observaciones.fiebre ? 'Sí' : 'No'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={observaciones.mordidas}
+                      onChange={(e) => setObservaciones({ ...observaciones, mordidas: e.target.checked })}
+                      className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                      disabled={loading}
+                    />
+                    <img src="/mordida.png" alt="Mordidas" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                    <span className="flex-1 text-gray-700">Mordidas</span>
+                    <span className="text-sm text-gray-500">{observaciones.mordidas ? 'Sí' : 'No'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={observaciones.aruñado}
+                      onChange={(e) => setObservaciones({ ...observaciones, aruñado: e.target.checked })}
+                      className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                      disabled={loading}
+                    />
+                    <img src="/rasguno.png" alt="Arañado" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                    <span className="flex-1 text-gray-700">Arañado</span>
+                    <span className="text-sm text-gray-500">{observaciones.aruñado ? 'Sí' : 'No'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={observaciones.golpes}
+                      onChange={(e) => setObservaciones({ ...observaciones, golpes: e.target.checked })}
+                      className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                      disabled={loading}
+                    />
+                    <img src="/curita.png" alt="Golpes" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                    <span className="flex-1 text-gray-700">Golpes</span>
+                    <span className="text-sm text-gray-500">{observaciones.golpes ? 'Sí' : 'No'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={observaciones.otro}
+                      onChange={(e) => setObservaciones({ ...observaciones, otro: e.target.checked })}
+                      className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                      disabled={loading}
+                    />
+                    <span className="flex-1 text-gray-700">Otro</span>
+                    <span className="text-sm text-gray-500">{observaciones.otro ? 'Sí' : 'No'}</span>
+                  </label>
+
+                  {observaciones.otro && (
+                    <div className="ml-8 mt-2">
+                      <textarea
+                        value={observaciones.otro_texto}
+                        onChange={(e) => setObservaciones({ ...observaciones, otro_texto: e.target.value })}
+                        placeholder="Describe la observación..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint-500 focus:border-transparent"
+                        rows={3}
+                        disabled={loading}
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={observaciones.fiebre_salida}
+                      onChange={(e) => setObservaciones({ ...observaciones, fiebre_salida: e.target.checked })}
+                      className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                      disabled={loading}
+                    />
+                    <img src="/fiebre.png" alt="Fiebre" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                    <span className="flex-1 text-gray-700">Fiebre</span>
+                    <span className="text-sm text-gray-500">{observaciones.fiebre_salida ? 'Sí' : 'No'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={observaciones.mordidas_salida}
+                      onChange={(e) => setObservaciones({ ...observaciones, mordidas_salida: e.target.checked })}
+                      className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                      disabled={loading}
+                    />
+                    <img src="/mordida.png" alt="Mordidas" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                    <span className="flex-1 text-gray-700">Mordidas</span>
+                    <span className="text-sm text-gray-500">{observaciones.mordidas_salida ? 'Sí' : 'No'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={observaciones.aruñado_salida}
+                      onChange={(e) => setObservaciones({ ...observaciones, aruñado_salida: e.target.checked })}
+                      className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                      disabled={loading}
+                    />
+                    <img src="/rasguno.png" alt="Arañado" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                    <span className="flex-1 text-gray-700">Arañado</span>
+                    <span className="text-sm text-gray-500">{observaciones.aruñado_salida ? 'Sí' : 'No'}</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={observaciones.golpes_salida}
+                      onChange={(e) => setObservaciones({ ...observaciones, golpes_salida: e.target.checked })}
+                      className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                      disabled={loading}
+                    />
+                    <img src="/curita.png" alt="Golpes" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                    <span className="flex-1 text-gray-700">Golpes</span>
+                    <span className="text-sm text-gray-500">{observaciones.golpes_salida ? 'Sí' : 'No'}</span>
+                  </label>
+                </div>
+              )}
             </div>
 
             {/* Anotación */}

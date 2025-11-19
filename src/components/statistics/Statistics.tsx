@@ -26,6 +26,18 @@ interface AttendanceRecord {
   hora: string
   tipo: 'entrada' | 'salida'
   anotacion?: string
+  // Campos de observaciones para entrada
+  fiebre?: boolean
+  mordidas?: boolean
+  aruñado?: boolean
+  golpes?: boolean
+  otro?: boolean
+  otro_texto?: string
+  // Campos de observaciones para salida
+  fiebre_salida?: boolean
+  mordidas_salida?: boolean
+  aruñado_salida?: boolean
+  golpes_salida?: boolean
   nino?: {
     nombres: string
     apellidos: string
@@ -263,6 +275,16 @@ export function Statistics() {
         hora,
         tipo,
         anotacion,
+        fiebre,
+        mordidas,
+        aruñado,
+        golpes,
+        otro,
+        otro_texto,
+        fiebre_salida,
+        mordidas_salida,
+        aruñado_salida,
+        golpes_salida,
         ninos (
           nombres,
           apellidos,
@@ -308,6 +330,16 @@ export function Statistics() {
         hora: record.hora,
         tipo: record.tipo,
         anotacion: record.anotacion,
+        fiebre: record.fiebre,
+        mordidas: record.mordidas,
+        aruñado: record.aruñado,
+        golpes: record.golpes,
+        otro: record.otro,
+        otro_texto: record.otro_texto,
+        fiebre_salida: record.fiebre_salida,
+        mordidas_salida: record.mordidas_salida,
+        aruñado_salida: record.aruñado_salida,
+        golpes_salida: record.golpes_salida,
         nino: record.ninos
           ? {
               nombres: record.ninos.nombres,
@@ -583,6 +615,73 @@ export function Statistics() {
                         {record.anotacion && (
                           <p><strong>Nota:</strong> {record.anotacion}</p>
                         )}
+                        {record.tipo === 'entrada' && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <p className="font-medium text-gray-700 mb-1">Observaciones de Entrada:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {record.fiebre && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                                  <img src="/fiebre.png" alt="Fiebre" className="w-4 h-4" />
+                                  Fiebre
+                                </span>
+                              )}
+                              {record.mordidas && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 text-pink-800 rounded-full text-xs">
+                                  <img src="/mordida.png" alt="Mordidas" className="w-4 h-4" />
+                                  Mordidas
+                                </span>
+                              )}
+                              {record.aruñado && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+                                  <img src="/rasguno.png" alt="Arañado" className="w-4 h-4" />
+                                  Arañado
+                                </span>
+                              )}
+                              {record.golpes && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                                  <img src="/curita.png" alt="Golpes" className="w-4 h-4" />
+                                  Golpes
+                                </span>
+                              )}
+                              {record.otro && record.otro_texto && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
+                                  Otro: {record.otro_texto}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {record.tipo === 'salida' && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <p className="font-medium text-gray-700 mb-1">Observaciones de Salida:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {record.fiebre_salida && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                                  <img src="/fiebre.png" alt="Fiebre" className="w-4 h-4" />
+                                  Fiebre
+                                </span>
+                              )}
+                              {record.mordidas_salida && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 text-pink-800 rounded-full text-xs">
+                                  <img src="/mordida.png" alt="Mordidas" className="w-4 h-4" />
+                                  Mordidas
+                                </span>
+                              )}
+                              {record.aruñado_salida && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+                                  <img src="/rasguno.png" alt="Arañado" className="w-4 h-4" />
+                                  Arañado
+                                </span>
+                              )}
+                              {record.golpes_salida && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                                  <img src="/curita.png" alt="Golpes" className="w-4 h-4" />
+                                  Golpes
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -716,10 +815,76 @@ export function Statistics() {
                       <div className="text-sm text-gray-600">
                         <p><strong>Niño:</strong> {record.nino?.nombres} {record.nino?.apellidos}</p>
                         <p><strong>Acudiente:</strong> {record.acudiente?.nombres} {record.acudiente?.apellidos}</p>
-
                         <p><strong>Registrado por:</strong> {record.usuario_registra?.nombres} {record.usuario_registra?.apellidos} ({record.usuario_registra?.rol})</p>
                         {record.anotacion && (
                           <p><strong>Nota:</strong> {record.anotacion}</p>
+                        )}
+                        {record.tipo === 'entrada' && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <p className="font-medium text-gray-700 mb-1">Observaciones de Entrada:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {record.fiebre && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                                  <img src="/fiebre.png" alt="Fiebre" className="w-4 h-4" />
+                                  Fiebre
+                                </span>
+                              )}
+                              {record.mordidas && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 text-pink-800 rounded-full text-xs">
+                                  <img src="/mordida.png" alt="Mordidas" className="w-4 h-4" />
+                                  Mordidas
+                                </span>
+                              )}
+                              {record.aruñado && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+                                  <img src="/rasguno.png" alt="Arañado" className="w-4 h-4" />
+                                  Arañado
+                                </span>
+                              )}
+                              {record.golpes && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                                  <img src="/curita.png" alt="Golpes" className="w-4 h-4" />
+                                  Golpes
+                                </span>
+                              )}
+                              {record.otro && record.otro_texto && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
+                                  Otro: {record.otro_texto}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {record.tipo === 'salida' && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <p className="font-medium text-gray-700 mb-1">Observaciones de Salida:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {record.fiebre_salida && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                                  <img src="/fiebre.png" alt="Fiebre" className="w-4 h-4" />
+                                  Fiebre
+                                </span>
+                              )}
+                              {record.mordidas_salida && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 text-pink-800 rounded-full text-xs">
+                                  <img src="/mordida.png" alt="Mordidas" className="w-4 h-4" />
+                                  Mordidas
+                                </span>
+                              )}
+                              {record.aruñado_salida && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+                                  <img src="/rasguno.png" alt="Arañado" className="w-4 h-4" />
+                                  Arañado
+                                </span>
+                              )}
+                              {record.golpes_salida && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                                  <img src="/curita.png" alt="Golpes" className="w-4 h-4" />
+                                  Golpes
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>

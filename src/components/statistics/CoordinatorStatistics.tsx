@@ -110,6 +110,16 @@ export function CoordinatorStatistics() {
           fecha,
           hora,
           tipo,
+          fiebre,
+          mordidas,
+          aruñado,
+          golpes,
+          otro,
+          otro_texto,
+          fiebre_salida,
+          mordidas_salida,
+          aruñado_salida,
+          golpes_salida,
           acudientes (nombres, apellidos),
           terceros:tercero_id (nombres, apellidos),
           users (nombres, apellidos),
@@ -161,6 +171,16 @@ export function CoordinatorStatistics() {
         fecha,
         hora,
         tipo,
+        fiebre,
+        mordidas,
+        aruñado,
+        golpes,
+        otro,
+        otro_texto,
+        fiebre_salida,
+        mordidas_salida,
+        aruñado_salida,
+        golpes_salida,
         acudientes (nombres, apellidos),
         terceros:tercero_id (nombres, apellidos),
         users (nombres, apellidos),
@@ -307,36 +327,123 @@ export function CoordinatorStatistics() {
                 <h4 className="text-lg font-bold mb-2">Historial de Asistencias</h4>
                 {childDetails.registros?.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full border text-sm">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="p-2 border">Fecha</th>
-                          <th className="p-2 border">Hora</th>
-                          <th className="p-2 border">Tipo</th>
-                          <th className="p-2 border">Registrado por</th>
-                          <th className="p-2 border">Acudiente / Tercero</th>
-                          <th className="p-2 border">Guardería</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {childDetails.registros.map((r: any, idx: number) => (
-                          <tr key={idx} className="border-t">
-                            <td className="p-2 border">{r.fecha}</td>
-                            <td className="p-2 border">{r.hora}</td>
-                            <td className="p-2 border capitalize">{r.tipo}</td>
-                            <td className="p-2 border">{r.users?.nombres} {r.users?.apellidos}</td>
-                            <td className="p-2 border">
-                              {r.terceros
-                                ? `${r.terceros.nombres} ${r.terceros.apellidos} (tercero)`
-                                : r.acudientes
-                                  ? `${r.acudientes.nombres} ${r.acudientes.apellidos}`
-                                  : '—'}
-                            </td>
-                            <td className="p-2 border">{r.guarderias?.nombre}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div className="space-y-4">
+                      {childDetails.registros.map((r: any, idx: number) => (
+                        <div key={idx} className="border border-gray-200 rounded-lg p-4">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                            <div>
+                              <p className="text-xs text-gray-500">Fecha</p>
+                              <p className="font-medium">{r.fecha}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Hora</p>
+                              <p className="font-medium">{r.hora}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Tipo</p>
+                              <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
+                                r.tipo === 'entrada' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                              }`}>
+                                {r.tipo}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Guardería</p>
+                              <p className="font-medium">{r.guarderias?.nombre || 'N/A'}</p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3 text-sm">
+                            <div>
+                              <p className="text-xs text-gray-500">Registrado por</p>
+                              <p className="font-medium">{r.users?.nombres} {r.users?.apellidos}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Acudiente / Tercero</p>
+                              <p className="font-medium">
+                                {r.terceros
+                                  ? `${r.terceros.nombres} ${r.terceros.apellidos} (tercero)`
+                                  : r.acudientes
+                                    ? `${r.acudientes.nombres} ${r.acudientes.apellidos}`
+                                    : '—'}
+                              </p>
+                            </div>
+                          </div>
+                          {r.tipo === 'entrada' && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <p className="text-xs font-medium text-gray-700 mb-2">Observaciones de Entrada:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {r.fiebre && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                                    <img src="/fiebre.png" alt="Fiebre" className="w-4 h-4" />
+                                    Fiebre
+                                  </span>
+                                )}
+                                {r.mordidas && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 text-pink-800 rounded-full text-xs">
+                                    <img src="/mordida.png" alt="Mordidas" className="w-4 h-4" />
+                                    Mordidas
+                                  </span>
+                                )}
+                                {r.aruñado && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+                                    <img src="/rasguno.png" alt="Arañado" className="w-4 h-4" />
+                                    Arañado
+                                  </span>
+                                )}
+                                {r.golpes && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                                    <img src="/curita.png" alt="Golpes" className="w-4 h-4" />
+                                    Golpes
+                                  </span>
+                                )}
+                                {r.otro && r.otro_texto && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
+                                    Otro: {r.otro_texto}
+                                  </span>
+                                )}
+                                {!r.fiebre && !r.mordidas && !r.aruñado && !r.golpes && !r.otro && (
+                                  <span className="text-xs text-gray-500">Sin observaciones</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {r.tipo === 'salida' && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <p className="text-xs font-medium text-gray-700 mb-2">Observaciones de Salida:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {r.fiebre_salida && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                                    <img src="/fiebre.png" alt="Fiebre" className="w-4 h-4" />
+                                    Fiebre
+                                  </span>
+                                )}
+                                {r.mordidas_salida && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 text-pink-800 rounded-full text-xs">
+                                    <img src="/mordida.png" alt="Mordidas" className="w-4 h-4" />
+                                    Mordidas
+                                  </span>
+                                )}
+                                {r.aruñado_salida && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+                                    <img src="/rasguno.png" alt="Arañado" className="w-4 h-4" />
+                                    Arañado
+                                  </span>
+                                )}
+                                {r.golpes_salida && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                                    <img src="/curita.png" alt="Golpes" className="w-4 h-4" />
+                                    Golpes
+                                  </span>
+                                )}
+                                {!r.fiebre_salida && !r.mordidas_salida && !r.aruñado_salida && !r.golpes_salida && (
+                                  <span className="text-xs text-gray-500">Sin observaciones</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500">No hay registros de asistencia disponibles.</p>

@@ -39,6 +39,19 @@ export default function RegistroTerceros() {
   const [loading, setLoading] = useState(false);
   const [registroHoy, setRegistroHoy] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [tipoRegistro, setTipoRegistro] = useState<"entrada" | "salida">("entrada");
+  const [observaciones, setObservaciones] = useState({
+    fiebre: false,
+    mordidas: false,
+    aruñado: false,
+    golpes: false,
+    otro: false,
+    otro_texto: "",
+    fiebre_salida: false,
+    mordidas_salida: false,
+    aruñado_salida: false,
+    golpes_salida: false,
+  });
 
   const [tercero, setTercero] = useState({
     nombres: "",
@@ -108,13 +121,17 @@ export default function RegistroTerceros() {
       return;
     }
 
+    const aulaNombre = Array.isArray(data.aulas) 
+      ? (data.aulas[0] as any)?.nombre_aula || "" 
+      : (data.aulas as any)?.nombre_aula || "";
+
     setNino({
       id: data.id,
       nombres: data.nombres,
       apellidos: data.apellidos,
       numero_documento: data.numero_documento,
       aula_id: data.aula_id,
-      aula_nombre: data.aulas?.nombre_aula || "",
+      aula_nombre: aulaNombre,
       guarderia_id: data.guarderia_id,
     });
 
@@ -189,17 +206,35 @@ export default function RegistroTerceros() {
       return;
     }
 
+    const insertData: any = {
+      tipo,
+      nino_id: nino.id,
+      tercero_id: terceroData.id,
+      usuario_registra_id: user.id,
+      fecha: fechaLocal,
+      guarderia_id: user.guarderia_id,
+      aula_id: nino.aula_id,
+    };
+
+    if (tipo === "entrada") {
+      insertData.fiebre = observaciones.fiebre;
+      insertData.mordidas = observaciones.mordidas;
+      insertData.aruñado = observaciones.aruñado;
+      insertData.golpes = observaciones.golpes;
+      insertData.otro = observaciones.otro;
+      if (observaciones.otro && observaciones.otro_texto.trim()) {
+        insertData.otro_texto = observaciones.otro_texto.trim();
+      }
+    } else {
+      insertData.fiebre_salida = observaciones.fiebre_salida;
+      insertData.mordidas_salida = observaciones.mordidas_salida;
+      insertData.aruñado_salida = observaciones.aruñado_salida;
+      insertData.golpes_salida = observaciones.golpes_salida;
+    }
+
     const { error: asistenciaError } = await supabase
       .from("registros_asistencia")
-      .insert([{
-        tipo,
-        nino_id: nino.id,
-        tercero_id: terceroData.id,
-        usuario_registra_id: user.id,
-        fecha: fechaLocal,
-        guarderia_id: user.guarderia_id,
-        aula_id: nino.aula_id,
-      }]);
+      .insert([insertData]);
 
     setSaving(false);
 
@@ -222,7 +257,20 @@ export default function RegistroTerceros() {
       foto_frente: "",
       foto_reverso: "",
     });
+    setObservaciones({
+      fiebre: false,
+      mordidas: false,
+      aruñado: false,
+      golpes: false,
+      otro: false,
+      otro_texto: "",
+      fiebre_salida: false,
+      mordidas_salida: false,
+      aruñado_salida: false,
+      golpes_salida: false,
+    });
     setRegistroHoy(tipo);
+    setTipoRegistro("entrada");
   };
 
   return  (
@@ -368,6 +416,185 @@ export default function RegistroTerceros() {
             </label>
           </div>
 
+          {/* Selección de tipo de registro */}
+          <div className="mt-4 mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo de registro
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setTipoRegistro("entrada")}
+                disabled={registroHoy === "entrada" || saving}
+                className={`p-3 rounded-lg border-2 transition-all ${
+                  tipoRegistro === "entrada"
+                    ? "border-green-500 bg-green-50"
+                    : "border-gray-300 bg-white hover:border-green-300"
+                } ${registroHoy === "entrada" ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <span className={`font-semibold ${tipoRegistro === "entrada" ? "text-green-700" : "text-gray-700"}`}>
+                  Entrada
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTipoRegistro("salida")}
+                disabled={registroHoy !== "entrada" || saving}
+                className={`p-3 rounded-lg border-2 transition-all ${
+                  tipoRegistro === "salida"
+                    ? "border-red-500 bg-red-50"
+                    : "border-gray-300 bg-white hover:border-red-300"
+                } ${registroHoy !== "entrada" ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <span className={`font-semibold ${tipoRegistro === "salida" ? "text-red-700" : "text-gray-700"}`}>
+                  Salida
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Observaciones */}
+          <div className="mt-4 mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Observaciones {tipoRegistro === "entrada" ? "de Entrada" : "de Salida"}
+            </label>
+            
+            {tipoRegistro === "entrada" ? (
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={observaciones.fiebre}
+                    onChange={(e) => setObservaciones({ ...observaciones, fiebre: e.target.checked })}
+                    className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                    disabled={saving}
+                  />
+                  <img src="/fiebre.png" alt="Fiebre" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                  <span className="flex-1 text-gray-700">Fiebre</span>
+                  <span className="text-sm text-gray-500">{observaciones.fiebre ? "Sí" : "No"}</span>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={observaciones.mordidas}
+                    onChange={(e) => setObservaciones({ ...observaciones, mordidas: e.target.checked })}
+                    className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                    disabled={saving}
+                  />
+                  <img src="/mordida.png" alt="Mordidas" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                  <span className="flex-1 text-gray-700">Mordidas</span>
+                  <span className="text-sm text-gray-500">{observaciones.mordidas ? "Sí" : "No"}</span>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={observaciones.aruñado}
+                    onChange={(e) => setObservaciones({ ...observaciones, aruñado: e.target.checked })}
+                    className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                    disabled={saving}
+                  />
+                  <img src="/rasguno.png" alt="Arañado" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                  <span className="flex-1 text-gray-700">Arañado</span>
+                  <span className="text-sm text-gray-500">{observaciones.aruñado ? "Sí" : "No"}</span>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={observaciones.golpes}
+                    onChange={(e) => setObservaciones({ ...observaciones, golpes: e.target.checked })}
+                    className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                    disabled={saving}
+                  />
+                  <img src="/curita.png" alt="Golpes" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                  <span className="flex-1 text-gray-700">Golpes</span>
+                  <span className="text-sm text-gray-500">{observaciones.golpes ? "Sí" : "No"}</span>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={observaciones.otro}
+                    onChange={(e) => setObservaciones({ ...observaciones, otro: e.target.checked })}
+                    className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                    disabled={saving}
+                  />
+                  <span className="flex-1 text-gray-700">Otro</span>
+                  <span className="text-sm text-gray-500">{observaciones.otro ? "Sí" : "No"}</span>
+                </label>
+
+                {observaciones.otro && (
+                  <div className="ml-8 mt-2">
+                    <textarea
+                      value={observaciones.otro_texto}
+                      onChange={(e) => setObservaciones({ ...observaciones, otro_texto: e.target.value })}
+                      placeholder="Describe la observación..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint-500 focus:border-transparent"
+                      rows={3}
+                      disabled={saving}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={observaciones.fiebre_salida}
+                    onChange={(e) => setObservaciones({ ...observaciones, fiebre_salida: e.target.checked })}
+                    className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                    disabled={saving}
+                  />
+                  <img src="/fiebre.png" alt="Fiebre" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                  <span className="flex-1 text-gray-700">Fiebre</span>
+                  <span className="text-sm text-gray-500">{observaciones.fiebre_salida ? "Sí" : "No"}</span>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={observaciones.mordidas_salida}
+                    onChange={(e) => setObservaciones({ ...observaciones, mordidas_salida: e.target.checked })}
+                    className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                    disabled={saving}
+                  />
+                  <img src="/mordida.png" alt="Mordidas" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                  <span className="flex-1 text-gray-700">Mordidas</span>
+                  <span className="text-sm text-gray-500">{observaciones.mordidas_salida ? "Sí" : "No"}</span>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={observaciones.aruñado_salida}
+                    onChange={(e) => setObservaciones({ ...observaciones, aruñado_salida: e.target.checked })}
+                    className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                    disabled={saving}
+                  />
+                  <img src="/rasguno.png" alt="Arañado" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                  <span className="flex-1 text-gray-700">Arañado</span>
+                  <span className="text-sm text-gray-500">{observaciones.aruñado_salida ? "Sí" : "No"}</span>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={observaciones.golpes_salida}
+                    onChange={(e) => setObservaciones({ ...observaciones, golpes_salida: e.target.checked })}
+                    className="w-5 h-5 rounded-full text-mint-600 focus:ring-mint-500 border-gray-300"
+                    disabled={saving}
+                  />
+                  <img src="/curita.png" alt="Golpes" className="w-6 h-6 sm:w-7 sm:h-7 object-contain flex-shrink-0" />
+                  <span className="flex-1 text-gray-700">Golpes</span>
+                  <span className="text-sm text-gray-500">{observaciones.golpes_salida ? "Sí" : "No"}</span>
+                </label>
+              </div>
+            )}
+          </div>
+
           {/* Botones */}
           <div className="mt-4 flex gap-3">
             {!registroHoy && (
@@ -376,7 +603,10 @@ export default function RegistroTerceros() {
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white bg-green-500 hover:bg-green-600 transition ${
                   saving ? "opacity-70 cursor-not-allowed" : ""
                 }`}
-                onClick={() => registrarAsistencia("entrada")}
+                onClick={() => {
+                  setTipoRegistro("entrada");
+                  registrarAsistencia("entrada");
+                }}
               >
                 <CheckCircle className="w-5 h-5" />
                 Registrar ENTRADA
@@ -388,7 +618,10 @@ export default function RegistroTerceros() {
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white bg-red-500 hover:bg-red-600 transition ${
                   saving ? "opacity-70 cursor-not-allowed" : ""
                 }`}
-                onClick={() => registrarAsistencia("salida")}
+                onClick={() => {
+                  setTipoRegistro("salida");
+                  registrarAsistencia("salida");
+                }}
               >
                 <XCircle className="w-5 h-5" />
                 Registrar SALIDA
