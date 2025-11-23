@@ -62,6 +62,7 @@ CREATE TABLE public.ninos (
   apellidos text NOT NULL,
   tipo_documento text NOT NULL DEFAULT 'TI'::text,
   numero_documento text NOT NULL UNIQUE,
+  fecha_nacimiento date,
   aula_id uuid,
   activo boolean NOT NULL DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),

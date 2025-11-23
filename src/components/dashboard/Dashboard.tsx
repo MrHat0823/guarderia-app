@@ -4,7 +4,6 @@ import {
   Users, 
   Baby, 
   School, 
-  CheckCircle, 
   Calendar, 
   Clock,
   TrendingUp,
@@ -18,7 +17,8 @@ import {
   Activity,
   BarChart3,
   Search,
-  X
+  X,
+  Cake
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -69,6 +69,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [acudienteResult, setAcudienteResult] = useState<any>(null)
   const [ninoResult, setNinoResult] = useState<any>(null)
   const [searching, setSearching] = useState(false)
+  const [showChildrenByClassroom, setShowChildrenByClassroom] = useState(false)
+  const [aulas, setAulas] = useState<any[]>([])
+  const [selectedAulaId, setSelectedAulaId] = useState('')
+  const [childrenByClassroom, setChildrenByClassroom] = useState<any[]>([])
+  const [loadingChildren, setLoadingChildren] = useState(false)
+  const [showBirthdaysModal, setShowBirthdaysModal] = useState(false)
+  const [birthdayChildren, setBirthdayChildren] = useState<any[]>([])
 
   // Actualizar hora cada segundo
   useEffect(() => {
@@ -79,27 +86,31 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return () => clearInterval(timer)
   }, [])
 
- useEffect(() => {
-  if (user?.guarderia_id) {
-    const initializeData = async () => {
-      setInitialLoading(true)
-      await Promise.all([
-        loadStats(true),
+  useEffect(() => {
+    if (user?.guarderia_id) {
+      loadAulasForClassroom()
+      loadBirthdayChildren()
+      
+      const initializeData = async () => {
+        setInitialLoading(true)
+        await Promise.all([
+          loadStats(true),
+          loadChildrenInFacility()
+        ])
+        setInitialLoading(false)
+      }
+
+      initializeData()
+
+      const interval = setInterval(() => {
+        loadStats(false)
         loadChildrenInFacility()
-      ])
-      setInitialLoading(false)
+        loadBirthdayChildren()
+      }, 30000)
+
+      return () => clearInterval(interval)
     }
-
-    initializeData()
-
-    const interval = setInterval(() => {
-      loadStats(false)
-      loadChildrenInFacility()
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }
-}, [user?.guarderia_id])
+  }, [user?.guarderia_id])
 
 
 const loadStats = async (isInitial = false) => {
@@ -409,6 +420,144 @@ const loadChildrenInFacility = async () => {
     setNinoResult(null)
   }
 
+  const loadAulasForClassroom = async () => {
+    try {
+      if (!user?.guarderia_id) return
+
+      const { data, error } = await supabase
+        .from('aulas')
+        .select('*')
+        .eq('guarderia_id', user.guarderia_id)
+        .order('nombre_aula')
+
+      if (error) throw error
+      setAulas(data || [])
+    } catch (error) {
+      console.error('Error loading aulas:', error)
+      setAulas([])
+    }
+  }
+
+  const loadChildrenByClassroom = async (aulaId: string) => {
+    if (!aulaId || !user?.guarderia_id) {
+      setChildrenByClassroom([])
+      return
+    }
+
+    setLoadingChildren(true)
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd')
+
+      // Cargar niños del aula
+      const { data: ninos, error: ninosError } = await supabase
+        .from('ninos')
+        .select('id, nombres, apellidos, numero_documento, fecha_nacimiento')
+        .eq('aula_id', aulaId)
+        .eq('guarderia_id', user.guarderia_id)
+        .eq('activo', true)
+        .order('nombres')
+
+      if (ninosError) throw ninosError
+
+      // Cargar registros de asistencia de hoy
+      const { data: asistencias, error: asistenciasError } = await supabase
+        .from('registros_asistencia')
+        .select('nino_id')
+        .eq('fecha', today)
+        .eq('tipo', 'entrada')
+        .eq('guarderia_id', user.guarderia_id)
+
+      if (asistenciasError) throw asistenciasError
+
+      const asistenciaSet = new Set(asistencias?.map(a => a.nino_id) || [])
+
+      const childrenWithAttendance = (ninos || []).map(nino => ({
+        ...nino,
+        asistio: asistenciaSet.has(nino.id)
+      }))
+
+      setChildrenByClassroom(childrenWithAttendance)
+    } catch (error) {
+      console.error('Error loading children by classroom:', error)
+      setChildrenByClassroom([])
+    } finally {
+      setLoadingChildren(false)
+    }
+  }
+
+  const calculateAge = (fechaNacimiento: string | null): string => {
+    if (!fechaNacimiento) return 'No especificada'
+    
+    const birthDate = new Date(fechaNacimiento)
+    const today = new Date()
+    
+    let years = today.getFullYear() - birthDate.getFullYear()
+    let months = today.getMonth() - birthDate.getMonth()
+    
+    if (months < 0) {
+      years--
+      months += 12
+    }
+    
+    return `${years} año${years !== 1 ? 's' : ''} ${months} mes${months !== 1 ? 'es' : ''}`
+  }
+
+  const handleAulaChange = (aulaId: string) => {
+    setSelectedAulaId(aulaId)
+    loadChildrenByClassroom(aulaId)
+  }
+
+  const loadBirthdayChildren = async () => {
+    try {
+      if (!user?.guarderia_id) return
+
+      const today = new Date()
+      const month = today.getMonth() + 1
+      const day = today.getDate()
+
+      const { data, error } = await supabase
+        .from('ninos')
+        .select(`
+          id,
+          nombres,
+          apellidos,
+          fecha_nacimiento,
+          aulas (
+            nombre_aula,
+            nivel_educativo
+          )
+        `)
+        .eq('guarderia_id', user.guarderia_id)
+        .eq('activo', true)
+        .not('fecha_nacimiento', 'is', null)
+
+      if (error) throw error
+
+      // Filtrar en el cliente por día y mes
+      const birthdays = (data || []).filter(nino => {
+        if (!nino.fecha_nacimiento) return false
+        
+        // Parsear la fecha directamente desde el string para evitar problemas de zona horaria
+        const fechaParts = nino.fecha_nacimiento.split('-')
+        const birthMonth = parseInt(fechaParts[1], 10)
+        const birthDay = parseInt(fechaParts[2], 10)
+        
+        return birthMonth === month && birthDay === day
+      })
+
+      setBirthdayChildren(birthdays)
+    } catch (error) {
+      console.error('Error loading birthday children:', error)
+      setBirthdayChildren([])
+    }
+  }
+
+  const calculateBirthdayAge = (fechaNacimiento: string): number => {
+    const birthDate = new Date(fechaNacimiento)
+    const today = new Date()
+    return today.getFullYear() - birthDate.getFullYear()
+  }
+
   const StatCard = ({ icon: Icon, iconImage, title, value, color, trend, onClick, refreshing }: {
     icon?: React.ComponentType<any>
     iconImage?: string
@@ -555,10 +704,12 @@ const loadChildrenInFacility = async () => {
             color="bg-green-100 text-green-600"
           />
           <StatCard
-            iconImage="/asistencia.png"
-            title="Asistencia Hoy"
-            value={stats.asistenciaHoy}
-            color="bg-mint-100 text-mint-600"
+            iconImage="/birthday.png"
+            title="Cumpleaños"
+            value={birthdayChildren.length}
+            color="bg-pink-100 text-pink-600"
+            onClick={() => setShowBirthdaysModal(true)}
+            refreshing={refreshing}
           />
           <StatCard
             iconImage="/gps.png"
@@ -644,12 +795,12 @@ const loadChildrenInFacility = async () => {
               
               {user?.rol === 'admin' && (
                 <button 
-                  onClick={() => handleQuickAction('children')}
+                  onClick={() => setShowChildrenByClassroom(true)}
                   className="group p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl hover:from-purple-100 hover:to-purple-200 transition-all duration-200 border border-purple-200 hover:shadow-md"
                 >
-                  <Baby className="w-10 h-10 text-purple-600 mb-3 group-hover:scale-110 transition-transform" />
+                  <School className="w-10 h-10 text-purple-600 mb-3 group-hover:scale-110 transition-transform" />
                   <p className="text-sm font-medium text-gray-900">
-                    Gestionar Niños
+                    Niños por Aula
                   </p>
                 </button>
               )}
@@ -771,6 +922,223 @@ const loadChildrenInFacility = async () => {
                     </h3>
                     <p className="text-gray-600">
                       Todos los niños han salido o no hay registros de entrada para hoy.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Cumpleaños */}
+        {showBirthdaysModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-pink-50 to-yellow-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                      <Cake className="w-6 h-6 text-pink-600" />
+                      Cumpleaños de Hoy 🎉
+                    </h2>
+                    <p className="text-gray-600 mt-1">
+                      {birthdayChildren.length} {birthdayChildren.length === 1 ? 'niño cumple' : 'niños cumplen'} años hoy
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowBirthdaysModal(false)}
+                    className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                  >
+                    <X className="w-6 h-6 text-gray-500" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                {birthdayChildren.length > 0 ? (
+                  <div className="space-y-4">
+                    {birthdayChildren.map((child) => (
+                      <div key={child.id} className="p-5 border-2 border-pink-200 rounded-xl bg-gradient-to-r from-pink-50 to-yellow-50 hover:shadow-md transition-all">
+                        <div className="flex items-start gap-4">
+                          <div className="w-16 h-16 bg-pink-200 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Cake className="w-8 h-8 text-pink-600" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-xs text-gray-500 mb-1">Nombre completo</p>
+                                <p className="text-lg font-bold text-gray-900">
+                                  {child.nombres} {child.apellidos}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500 mb-1">Fecha de nacimiento</p>
+                                <p className="text-gray-700">
+                                  {new Date(child.fecha_nacimiento).toLocaleDateString('es-ES', {
+                                    day: '2-digit',
+                                    month: 'long',
+                                    year: 'numeric'
+                                  })}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500 mb-1">Aula</p>
+                                <p className="text-gray-700">
+                                  {child.aulas ? `${child.aulas.nombre_aula} - ${child.aulas.nivel_educativo}` : 'Sin aula asignada'}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500 mb-1">Años que cumple</p>
+                                <p className="text-2xl font-bold text-pink-600">
+                                  {calculateBirthdayAge(child.fecha_nacimiento)} años 🎂
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Cake className="w-10 h-10 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      No hay cumpleaños hoy
+                    </h3>
+                    <p className="text-gray-600">
+                      Ningún niño cumple años el día de hoy.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Niños por Aula */}
+        {showChildrenByClassroom && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+              <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-purple-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                      <School className="w-6 h-6 text-purple-600" />
+                      Niños por Aula
+                    </h2>
+                    <p className="text-gray-600 mt-1">
+                      Selecciona un aula para ver los niños matriculados
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowChildrenByClassroom(false)
+                      setSelectedAulaId('')
+                      setChildrenByClassroom([])
+                    }}
+                    className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                  >
+                    <X className="w-6 h-6 text-gray-500" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {/* Selector de Aula */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Seleccionar Aula
+                  </label>
+                  <select
+                    value={selectedAulaId}
+                    onChange={(e) => handleAulaChange(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="">-- Selecciona un aula --</option>
+                    {aulas.map((aula) => (
+                      <option key={aula.id} value={aula.id}>
+                        {aula.nombre_aula} - {aula.nivel_educativo}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Contador y Lista de Niños */}
+                {selectedAulaId && (
+                  <div>
+                    <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                      <p className="text-lg font-semibold text-purple-900">
+                        Total de niños: {childrenByClassroom.length}
+                      </p>
+                    </div>
+
+                    <div className="overflow-y-auto max-h-[calc(90vh-400px)]">
+                      {loadingChildren ? (
+                        <div className="flex items-center justify-center py-12">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                        </div>
+                      ) : childrenByClassroom.length > 0 ? (
+                        <div className="space-y-3">
+                          {childrenByClassroom.map((child) => (
+                            <div key={child.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">Nombre completo</p>
+                                  <p className="font-semibold text-gray-900">
+                                    {child.nombres} {child.apellidos}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">Documento</p>
+                                  <p className="text-gray-700">{child.numero_documento}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">Edad</p>
+                                  <p className="text-gray-700">{calculateAge(child.fecha_nacimiento)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">Asistió hoy</p>
+                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                    child.asistio 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {child.asistio ? 'SÍ' : 'NO'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Baby className="w-10 h-10 text-gray-400" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                            No hay niños en esta aula
+                          </h3>
+                          <p className="text-gray-600">
+                            El aula seleccionada no tiene niños matriculados actualmente.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {!selectedAulaId && (
+                  <div className="text-center py-12">
+                    <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <School className="w-10 h-10 text-purple-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Selecciona un aula
+                    </h3>
+                    <p className="text-gray-600">
+                      Elige un aula del menú desplegable para ver los niños matriculados.
                     </p>
                   </div>
                 )}

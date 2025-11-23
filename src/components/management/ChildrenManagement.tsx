@@ -28,6 +28,7 @@ export function ChildrenManagement() {
     apellidos: '',
     tipo_documento: 'RC',
     numero_documento: '',
+    fecha_nacimiento: '',
     aula_id: '',
     activo: true
   })
@@ -112,6 +113,7 @@ useEffect(() => {
       apellidos: formData.apellidos,
       tipo_documento: formData.tipo_documento,
       numero_documento: formData.numero_documento,
+      fecha_nacimiento: formData.fecha_nacimiento || null,
       aula_id: formData.aula_id || null,
       guarderia_id: user?.guarderia_id, // Asignación automática
       activo: formData.activo
@@ -158,6 +160,7 @@ useEffect(() => {
       apellidos: '',
       tipo_documento: 'TI',
       numero_documento: '',
+      fecha_nacimiento: '',
       aula_id: '',
       activo: true
     })
@@ -177,6 +180,7 @@ useEffect(() => {
       apellidos: child.apellidos,
       tipo_documento: child.tipo_documento,
       numero_documento: child.numero_documento,
+      fecha_nacimiento: child.fecha_nacimiento || '',
       aula_id: child.aula_id || '',
       activo: child.activo
     })
@@ -316,6 +320,17 @@ useEffect(() => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Fecha de Nacimiento
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.fecha_nacimiento}
+                    onChange={(e) => setFormData({ ...formData, fecha_nacimiento: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mint-500 focus:border-mint-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Aula
                   </label>
                   <select
@@ -354,6 +369,7 @@ useEffect(() => {
                         apellidos: '',
                         tipo_documento: 'TI',
                         numero_documento: '',
+                        fecha_nacimiento: '',
                         aula_id: '',
                         activo: true
                       })
