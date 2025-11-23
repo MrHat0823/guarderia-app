@@ -974,11 +974,11 @@ const loadChildrenInFacility = async () => {
                               <div>
                                 <p className="text-xs text-gray-500 mb-1">Fecha de nacimiento</p>
                                 <p className="text-gray-700">
-                                  {new Date(child.fecha_nacimiento).toLocaleDateString('es-ES', {
-                                    day: '2-digit',
-                                    month: 'long',
-                                    year: 'numeric'
-                                  })}
+                                  {(() => {
+                                    const [year, month, day] = child.fecha_nacimiento.split('-')
+                                    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                                    return format(date, "d 'de' MMMM 'de' yyyy", { locale: es })
+                                  })()}
                                 </p>
                               </div>
                               <div>
