@@ -13,27 +13,27 @@
   "dir": "ltr",
   "icons": [
     {
-      "src": "/icono-app.png",
-      "sizes": "192x192",
-      "type": "image/png",
+      "src": "/icono-app.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icono-app.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/icono-app.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icono-app.png",
-      "sizes": "192x192",
-      "type": "image/png",
+      "src": "/icono-app.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "maskable"
     },
     {
-      "src": "/icono-app.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/icono-app.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "maskable"
     }
   ],
@@ -43,14 +43,14 @@
       "short_name": "Inicio",
       "description": "Ir al dashboard principal",
       "url": "/",
-      "icons": [{ "src": "/icono-app.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icono-app.svg", "sizes": "any", "type": "image/svg+xml" }]
     },
     {
       "name": "Escáner QR",
       "short_name": "QR",
       "description": "Abrir escáner de códigos QR",
       "url": "/?tab=qr-scanner",
-      "icons": [{ "src": "/icono-app.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icono-app.svg", "sizes": "any", "type": "image/svg+xml" }]
     }
   ],
   "screenshots": [
